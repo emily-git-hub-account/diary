@@ -12,6 +12,7 @@ const SHEETS = {
   CATEGORIES: '分類',
   LISTS: '清單',
   CHECKS: '打卡',
+  SUMMARIES: '每日總結',
 };
 
 const HEADERS = {
@@ -19,6 +20,7 @@ const HEADERS = {
   [SHEETS.CATEGORIES]: ['id', '名稱', '顏色', '排序', '啟用'],
   [SHEETS.LISTS]: ['id', '名稱', '開始日', '結束日', '項目'],
   [SHEETS.CHECKS]: ['日期', '清單ID', '已完成項目', '更新時間'],
+  [SHEETS.SUMMARIES]: ['日期', '內容', '建立時間'],
 };
 
 const DEFAULT_CATEGORIES = [
@@ -118,7 +120,9 @@ function doPost(e) {
 const ACTIONS = {
   login: () => true,
   init: () => ({ categories: readCategories_(), lists: readLists_(), prompt: promptInfo_() }),
-  savePrompt: b => savePrompt_(b.prompt),
+  savePrompt: b => savePrompt_(b.kind, b.prompt),
+  summarizeDay: b => summarizeDay_(b.date),
+  getSummaries: b => readSummaries_().filter(r => r.date >= b.from && r.date <= b.to),
   getEntries: b => readEntries_().filter(r => r.date >= b.from && r.date <= b.to),
   getEntriesByCategory: b => readEntries_().filter(r => r.categoryId === b.categoryId),
   saveEntry: b => withLock_(() => saveEntry_(b.entry)),
@@ -240,40 +244,105 @@ function setCheck_(date, listId, done) {
 
 // ───────────────────────── Claude 整理 ─────────────────────────
 
-const DEFAULT_PROMPT = [
-  '你是日記整理助手。使用者用語音輸入寫日記，你把轉出來的口語文字整理成通順、好讀的繁體中文日記。',
-  '規則：',
-  '1. 保留原意、第一人稱、原本的語氣和具體細節，不要加入使用者沒說過的事。',
-  '2. 修正聽寫錯字，刪掉「嗯、那個、然後然後」這類贅字和重複。',
-  '3. 適當分段；如果講了好幾件不同的事，可以用條列。',
-  '4. 不要說教、不要給建議、不要加評論或結語。',
-  '5. 只輸出整理後的內文，不要標題、不要前言。',
-].join('\n');
+const DEFAULT_PROMPTS = {
+  polish: [
+    '你是日記整理助手。使用者用語音輸入寫日記，你把轉出來的口語文字整理成通順、好讀的繁體中文日記。',
+    '規則：',
+    '1. 保留原意、第一人稱、原本的語氣和具體細節，不要加入使用者沒說過的事。',
+    '2. 修正聽寫錯字，刪掉「嗯、那個、然後然後」這類贅字和重複。',
+    '3. 適當分段；如果講了好幾件不同的事，可以用條列。',
+    '4. 不要說教、不要給建議、不要加評論或結語。',
+    '5. 只輸出整理後的內文，不要標題、不要前言。',
+  ].join('\n'),
+  summary: [
+    '你是一位睿智、溫和、話不多的人生導師，說話風格像納瓦爾（Naval Ravikant）：簡潔、直指本質，重視長期思維、內在平靜、自我覺察和複利。',
+    '使用者會給你他今天的日記和習慣打卡紀錄。請用繁體中文，照下面的格式寫：',
+    '',
+    '【今天的我】',
+    '用 3 到 5 個條列，整理今天做了什麼、感受到什麼、發現了什麼。只根據他寫的內容，不要編造。',
+    '',
+    '【給你的話】',
+    '2 到 4 句。先具體肯定今天做到的一件事，再給一個有智慧、可以帶著走的提醒。',
+    '像信任的朋友一樣真誠，不說教、不灌雞湯、不堆驚嘆號。',
+    '',
+    '不要假裝是納瓦爾本人，也不要直接引用他的名言。只輸出上面兩段，不要前言。',
+  ].join('\n'),
+};
+const PROMPT_KEYS = { polish: 'CUSTOM_PROMPT', summary: 'CUSTOM_SUMMARY_PROMPT' };
 
-// 使用者在 App 設定頁改過就用她的版本，沒改過用預設
-function getPrompt_() {
-  return PropertiesService.getScriptProperties().getProperty('CUSTOM_PROMPT') || DEFAULT_PROMPT;
+// 使用者在 App 設定頁改過就用他的版本，沒改過用預設
+function getPrompt_(kind) {
+  return PropertiesService.getScriptProperties().getProperty(PROMPT_KEYS[kind]) || DEFAULT_PROMPTS[kind];
 }
 
-function savePrompt_(prompt) {
+function savePrompt_(kind, prompt) {
+  kind = kind || 'polish';
+  if (!PROMPT_KEYS[kind]) throw new Error('未知的提示詞種類');
   const props = PropertiesService.getScriptProperties();
   prompt = String(prompt || '').trim();
-  if (!prompt || prompt === DEFAULT_PROMPT) props.deleteProperty('CUSTOM_PROMPT');
-  else props.setProperty('CUSTOM_PROMPT', prompt);
+  if (!prompt || prompt === DEFAULT_PROMPTS[kind]) props.deleteProperty(PROMPT_KEYS[kind]);
+  else props.setProperty(PROMPT_KEYS[kind], prompt);
   return promptInfo_();
 }
 
 function promptInfo_() {
-  return { prompt: getPrompt_(), defaultPrompt: DEFAULT_PROMPT };
+  return {
+    prompt: getPrompt_('polish'), defaultPrompt: DEFAULT_PROMPTS.polish,
+    summaryPrompt: getPrompt_('summary'), defaultSummaryPrompt: DEFAULT_PROMPTS.summary,
+  };
 }
 
 function polish_(text, categoryName) {
   text = String(text || '').trim();
   if (!text) throw new Error('沒有內容可以整理');
+  const system = getPrompt_('polish') + '\n\n這篇日記的分類是「' + (categoryName || '日記') + '」。';
+  return callClaude_(system, text);
+}
+
+// ───────────────────────── 每日總結 ─────────────────────────
+
+function readSummaries_() {
+  return readRows_(SHEETS.SUMMARIES).map(r => ({ date: r[0], content: r[1], createdAt: r[2] }));
+}
+
+function summarizeDay_(date) {
+  if (!date) throw new Error('缺少日期');
+  const entries = readEntries_().filter(e => e.date === date);
+  const lines = ['日期：' + date, '', '【日記】'];
+  if (entries.length) entries.forEach(e => lines.push('［' + e.categoryName + '］' + e.content, ''));
+  else lines.push('（這天沒有寫日記）', '');
+
+  let checked = 0;
+  const lists = readLists_().filter(l => l.start <= date && date <= l.end);
+  if (lists.length) {
+    lines.push('【習慣打卡】');
+    lists.forEach(l => {
+      const done = readChecks_(l.id)[date] || [];
+      checked += done.length;
+      lines.push(l.name + '：' + l.items.map(i => (done.indexOf(i.id) >= 0 ? '✓' : '✗') + i.name).join('、'));
+    });
+  }
+  if (!entries.length && !checked) throw new Error('這天還沒有日記或打卡，先寫一點再來整理吧');
+
+  const content = callClaude_(getPrompt_('summary'), lines.join('\n'));
+  return withLock_(() => {
+    const sh = sheet_(SHEETS.SUMMARIES);
+    const now = nowStr_();
+    const data = sh.getDataRange().getDisplayValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === date) {
+        sh.getRange(i + 1, 1, 1, 3).setValues([[date, content, now]]);
+        return { date: date, content: content, createdAt: now };
+      }
+    }
+    sh.appendRow([date, content, now]);
+    return { date: date, content: content, createdAt: now };
+  });
+}
+
+function callClaude_(system, text) {
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) throw new Error('還沒設定 Claude 金鑰，請到試算表選單「📔 日記設定 → ③ 設定 Claude 金鑰」。');
-
-  const system = getPrompt_() + '\n\n這篇日記的分類是「' + (categoryName || '日記') + '」。';
 
   const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',
@@ -302,7 +371,7 @@ function polish_(text, categoryName) {
     if (code === 400 && /credit/i.test(msg)) throw new Error('Claude 帳戶餘額不足，請到 console.anthropic.com 儲值。');
     throw new Error('Claude 整理失敗（' + code + '）：' + msg);
   }
-  if (body.stop_reason === 'refusal') throw new Error('Claude 這次沒辦法整理這段內容，請改用原文儲存。');
+  if (body.stop_reason === 'refusal') throw new Error('Claude 這次沒辦法處理這段內容，請稍後再試。');
   const out = (body.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
   if (!out) throw new Error('Claude 沒有回傳內容，請再試一次。');
   return out;
@@ -311,8 +380,16 @@ function polish_(text, categoryName) {
 // ───────────────────────── 共用工具 ─────────────────────────
 
 function sheet_(name) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
-  if (!sh) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  if (name !== SHEETS.SUMMARIES) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
+  // 後來才加的分頁，第一次用到時自動建立
+  sh = ss.insertSheet(name);
+  sh.appendRow(HEADERS[name]);
+  sh.setFrozenRows(1);
+  sh.getRange(1, 1, 1, HEADERS[name].length).setFontWeight('bold').setBackground('#F3EDE4');
+  sh.getRange(1, 1, sh.getMaxRows(), HEADERS[name].length).setNumberFormat('@');
   return sh;
 }
 

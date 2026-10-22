@@ -110,6 +110,10 @@ label.field { display: block; font-size: 14px; color: var(--muted); margin-botto
 .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
 .interim { color: var(--muted); font-size: 15px; min-height: 0; margin-top: 6px; }
+.summary-body { white-space: pre-wrap; word-break: break-word; line-height: 1.8; }
+.summary-h { display: block; font-family: var(--serif); color: var(--accent); margin-top: 14px; }
+.summary-h:first-child { margin-top: 6px; }
+.summary-card { background: color-mix(in srgb, var(--accent) 7%, var(--card)); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
 details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
 
 /* 打卡 */
@@ -266,6 +270,7 @@ const state = {
   categories: [],
   lists: [],
   months: {},        // 'YYYY-MM' → entries
+  summaries: {},     // 'YYYY-MM' → { date: summary }
   checks: {},        // listId → { date: [itemIds] }
   date: today(),
   draft: store.get('draft', null) || { date: today(), categoryId: '', raw: '', polished: '', id: '' },
@@ -280,6 +285,13 @@ async function loadMonth(ym, force) {
   const list = await api('getEntries', { from: ym + '-01', to: ym + '-31' });
   state.months[ym] = list;
   return list;
+}
+async function loadSummaries(ym) {
+  if (state.summaries[ym]) return state.summaries[ym];
+  const map = {};
+  try { (await api('getSummaries', { from: ym + '-01', to: ym + '-31' })).forEach(x => map[x.date] = x); }
+  catch (e) { if (!/未知的動作/.test(e.message)) throw e; }  // 後端還沒部署新版時當作沒有
+  return (state.summaries[ym] = map);
 }
 async function loadChecks(listId, force) {
   if (state.checks[listId] && !force) return state.checks[listId];
@@ -358,7 +370,8 @@ async function renderToday() {
     <section class="card">
       <h2>${isToday ? '今天' : '這天'}寫下的</h2>
       <div id="dayEntries"><div class="loading-page"><span class="spin"></span></div></div>
-    </section>`;
+    </section>
+    <section class="card" id="summaryCard"></section>`;
 
   $('#pickDate').onchange = e => { if (e.target.value) { state.date = e.target.value; renderToday(); } };
   $('#catChips').onclick = e => {
@@ -370,6 +383,7 @@ async function renderToday() {
   renderWriteStep();
   renderTodayChecks();
   renderDayEntries();
+  renderSummary();
 }
 
 function resetDraft() {
@@ -480,6 +494,30 @@ function updateMicUI() {
   if (!b) return;
   b.classList.toggle('rec', !!rec);
   b.innerHTML = rec ? '<span class="rec-dot"></span> 錄音中…按這裡停止' : '🎤 開始說話';
+}
+
+// 每日總結
+const summaryHtml = s => `<div class="summary-body">${esc(s.content)
+  .trim().replace(/\n*【(.+?)】\n?/g, '<b class="summary-h">$1</b>')}</div>`;
+
+async function renderSummary() {
+  const box = $('#summaryCard');
+  const date = state.date;
+  const label = date === today() ? '今天' : '這天';
+  let s = null;
+  try { s = (await loadSummaries(monthOf(date)))[date]; } catch (e) {}
+  if (state.tab !== 'today' || date !== state.date || !box.isConnected) return;
+  box.innerHTML = s ? `
+    <div class="spread"><h2 style="margin:0">🌙 ${label}的總結</h2><button class="btn small ghost" id="sumBtn">重新整理</button></div>
+    ${summaryHtml(s)}` : `
+    <h2>🌙 ${label}的總結</h2>
+    <p class="sub" style="margin:-4px 0 12px">寫完日記、打完卡之後，讓 Claude 幫你回顧${label}，再送你一段話。</p>
+    <button class="btn primary block" id="sumBtn">🌙 幫我整理${label}</button>`;
+  $('#sumBtn').onclick = e => busy(e.currentTarget, async () => {
+    const res = await api('summarizeDay', { date });
+    (state.summaries[monthOf(date)] = state.summaries[monthOf(date)] || {})[date] = res;
+    renderSummary();
+  });
 }
 
 async function saveEntry(content, raw) {
@@ -608,8 +646,8 @@ async function renderByDate() {
   $('#prevM').onclick = () => shift(-1);
   $('#nextM').onclick = () => shift(1);
 
-  let list;
-  try { list = await loadMonth(r.month); } catch (e) { $('#calBox').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  let list, sums;
+  try { [list, sums] = await Promise.all([loadMonth(r.month), loadSummaries(r.month)]); } catch (e) { $('#calBox').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (state.tab !== 'review' || r.mode !== 'date' || r.month !== `${y}-${pad(m)}`) return;
 
   const byDay = {};
@@ -637,6 +675,7 @@ async function renderByDate() {
   }
   ml.innerHTML = (r.day ? `<div class="spread"><span></span><button class="btn small ghost" id="allMonth">看整個月</button></div>` : '') +
     dates.map(ds => `<div class="day-head">${prettyDate(ds)}<span class="sub">${byDay[ds].length} 則</span></div>
+      ${sums[ds] ? `<section class="card summary-card">${summaryHtml(sums[ds])}</section>` : ''}
       <section class="card" style="padding-top:12px;padding-bottom:6px">${byDay[ds].map(e => entryHtml(e)).join('')}</section>`).join('');
   if ($('#allMonth')) $('#allMonth').onclick = () => { r.day = ''; renderByDate(); };
   bindEntryActions(ml, list, () => renderByDate());
@@ -772,6 +811,10 @@ function openListEditor(list) {
 }
 
 // ───────── 設定 ─────────
+const PROMPTS = [
+  { kind: 'polish', key: 'prompt', title: 'AI 整理方式', desc: '按「幫我整理」時，Claude 會照這段話整理你的日記。分類名稱會自動附在最後，不用寫進來。' },
+  { kind: 'summary', key: 'summaryPrompt', title: '每日總結方式', desc: '按「幫我整理今天」時，Claude 會照這段話寫今天的總結和給你的話。當天的日記和打卡會自動附上。' },
+];
 function renderSettings() {
   const cats = JSON.parse(JSON.stringify(state.categories));
   $('#view').innerHTML = `
@@ -785,16 +828,16 @@ function renderSettings() {
         <button class="btn primary" id="saveCats" style="flex:1">儲存分類</button>
       </div>
     </section>
-    <section class="card stack">
-      <h2>AI 整理方式</h2>
-      ${state.prompt ? `
-      <p class="sub" style="margin:-6px 0 0">按「幫我整理」時，Claude 會照這段話整理你的日記。分類名稱會自動附在最後，不用寫進來。</p>
-      <textarea id="promptBox" style="min-height:240px;font-size:15px">${esc(state.prompt.prompt)}</textarea>
+    ${state.prompt ? PROMPTS.filter(p => state.prompt[p.key] !== undefined).map(p => `
+    <section class="card stack" data-prompt="${p.kind}">
+      <h2>${p.title}</h2>
+      <p class="sub" style="margin:-6px 0 0">${p.desc}</p>
+      <textarea style="min-height:240px;font-size:15px">${esc(state.prompt[p.key])}</textarea>
       <div class="row">
-        <button class="btn ghost" id="resetPrompt">恢復預設</button>
-        <button class="btn primary" id="savePrompt" style="flex:1">儲存整理方式</button>
-      </div>` : '<p class="sub" style="margin:0">後端還沒更新到新版本，部署新版本後重新打開 App 就會出現。</p>'}
-    </section>
+        <button class="btn ghost" data-reset>恢復預設</button>
+        <button class="btn primary" data-save style="flex:1">儲存</button>
+      </div>
+    </section>`).join('') : '<section class="card"><p class="sub" style="margin:0">後端還沒更新到新版本，部署新版本後重新打開 App，這裡就會出現 AI 的設定。</p></section>'}
     <section class="card stack">
       <h2>加到手機主畫面</h2>
       <p class="sub" style="margin:0">Safari：點下方「分享」圖示 → 「加入主畫面」。<br>Chrome：點網址列右邊的「分享」圖示 → 「加入主畫面」。</p>
@@ -830,22 +873,24 @@ function renderSettings() {
     state.categories = await api('saveCategories', { categories: clean });
     toast('分類已儲存 ✓'); renderSettings();
   });
-  if (state.prompt) {
-    $('#savePrompt').onclick = () => busy($('#savePrompt'), async () => {
-      const text = $('#promptBox').value.trim();
-      if (!text) return toast('整理方式不能是空的，要回到原本的請按「恢復預設」');
-      state.prompt = await api('savePrompt', { prompt: text });
-      toast('整理方式已儲存 ✓');
+  document.querySelectorAll('[data-prompt]').forEach(sec => {
+    const p = PROMPTS.find(x => x.kind === sec.dataset.prompt);
+    const box = sec.querySelector('textarea');
+    sec.querySelector('[data-save]').onclick = e => busy(e.currentTarget, async () => {
+      const text = box.value.trim();
+      if (!text) return toast('不能是空的，要回到原本的請按「恢復預設」');
+      state.prompt = await api('savePrompt', { kind: p.kind, prompt: text });
+      toast('已儲存 ✓');
     });
-    $('#resetPrompt').onclick = () => {
-      if (!confirm('確定要恢復成原本的整理方式嗎？你改過的內容會不見。')) return;
-      busy($('#resetPrompt'), async () => {
-        state.prompt = await api('savePrompt', { prompt: '' });
-        $('#promptBox').value = state.prompt.prompt;
+    sec.querySelector('[data-reset]').onclick = e => {
+      if (!confirm('確定要恢復成原本的寫法嗎？你改過的內容會不見。')) return;
+      busy(e.currentTarget, async () => {
+        state.prompt = await api('savePrompt', { kind: p.kind, prompt: '' });
+        box.value = state.prompt[p.key];
         toast('已恢復預設 ✓');
       });
     };
-  }
+  });
   $('#logoutBtn').onclick = () => { if (confirm('確定要登出嗎？')) logout(); };
 }
 
