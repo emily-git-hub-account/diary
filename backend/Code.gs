@@ -117,7 +117,8 @@ function doPost(e) {
 
 const ACTIONS = {
   login: () => true,
-  init: () => ({ categories: readCategories_(), lists: readLists_() }),
+  init: () => ({ categories: readCategories_(), lists: readLists_(), prompt: promptInfo_() }),
+  savePrompt: b => savePrompt_(b.prompt),
   getEntries: b => readEntries_().filter(r => r.date >= b.from && r.date <= b.to),
   getEntriesByCategory: b => readEntries_().filter(r => r.categoryId === b.categoryId),
   saveEntry: b => withLock_(() => saveEntry_(b.entry)),
@@ -239,22 +240,40 @@ function setCheck_(date, listId, done) {
 
 // ───────────────────────── Claude 整理 ─────────────────────────
 
+const DEFAULT_PROMPT = [
+  '你是日記整理助手。使用者用語音輸入寫日記，你把轉出來的口語文字整理成通順、好讀的繁體中文日記。',
+  '規則：',
+  '1. 保留原意、第一人稱、原本的語氣和具體細節，不要加入使用者沒說過的事。',
+  '2. 修正聽寫錯字，刪掉「嗯、那個、然後然後」這類贅字和重複。',
+  '3. 適當分段；如果講了好幾件不同的事，可以用條列。',
+  '4. 不要說教、不要給建議、不要加評論或結語。',
+  '5. 只輸出整理後的內文，不要標題、不要前言。',
+].join('\n');
+
+// 使用者在 App 設定頁改過就用她的版本，沒改過用預設
+function getPrompt_() {
+  return PropertiesService.getScriptProperties().getProperty('CUSTOM_PROMPT') || DEFAULT_PROMPT;
+}
+
+function savePrompt_(prompt) {
+  const props = PropertiesService.getScriptProperties();
+  prompt = String(prompt || '').trim();
+  if (!prompt || prompt === DEFAULT_PROMPT) props.deleteProperty('CUSTOM_PROMPT');
+  else props.setProperty('CUSTOM_PROMPT', prompt);
+  return promptInfo_();
+}
+
+function promptInfo_() {
+  return { prompt: getPrompt_(), defaultPrompt: DEFAULT_PROMPT };
+}
+
 function polish_(text, categoryName) {
   text = String(text || '').trim();
   if (!text) throw new Error('沒有內容可以整理');
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) throw new Error('還沒設定 Claude 金鑰，請到試算表選單「📔 日記設定 → ③ 設定 Claude 金鑰」。');
 
-  const system = [
-    '你是日記整理助手。使用者用語音輸入寫日記，你把轉出來的口語文字整理成通順、好讀的繁體中文日記。',
-    '規則：',
-    '1. 保留原意、第一人稱、原本的語氣和具體細節，不要加入使用者沒說過的事。',
-    '2. 修正聽寫錯字，刪掉「嗯、那個、然後然後」這類贅字和重複。',
-    '3. 適當分段；如果講了好幾件不同的事，可以用條列。',
-    '4. 不要說教、不要給建議、不要加評論或結語。',
-    '5. 只輸出整理後的內文，不要標題、不要前言。',
-    '這篇日記的分類是「' + (categoryName || '日記') + '」。',
-  ].join('\n');
+  const system = getPrompt_() + '\n\n這篇日記的分類是「' + (categoryName || '日記') + '」。';
 
   const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',

@@ -304,7 +304,7 @@ async function start() {
   $('#view').innerHTML = '<div class="loading-page"><span class="spin"></span></div>';
   try {
     const d = await api('init');
-    state.categories = d.categories; state.lists = d.lists;
+    state.categories = d.categories; state.lists = d.lists; state.prompt = d.prompt || null;
     render();
   } catch (e) {
     $('#view').innerHTML = `<div class="empty">載入失敗：${esc(e.message)}<br><br><button class="btn" onclick="start()">再試一次</button></div>`;
@@ -714,6 +714,16 @@ function renderSettings() {
       </div>
     </section>
     <section class="card stack">
+      <h2>AI 整理方式</h2>
+      ${state.prompt ? `
+      <p class="sub" style="margin:-6px 0 0">按「幫我整理」時，Claude 會照這段話整理你的日記。分類名稱會自動附在最後，不用寫進來。</p>
+      <textarea id="promptBox" style="min-height:240px;font-size:15px">${esc(state.prompt.prompt)}</textarea>
+      <div class="row">
+        <button class="btn ghost" id="resetPrompt">恢復預設</button>
+        <button class="btn primary" id="savePrompt" style="flex:1">儲存整理方式</button>
+      </div>` : '<p class="sub" style="margin:0">後端還沒更新到新版本，部署新版本後重新打開 App 就會出現。</p>'}
+    </section>
+    <section class="card stack">
       <h2>加到手機主畫面</h2>
       <p class="sub" style="margin:0">Safari：點下方「分享」圖示 → 「加入主畫面」。<br>Chrome：點網址列右邊的「分享」圖示 → 「加入主畫面」。</p>
     </section>
@@ -748,6 +758,22 @@ function renderSettings() {
     state.categories = await api('saveCategories', { categories: clean });
     toast('分類已儲存 ✓'); renderSettings();
   });
+  if (state.prompt) {
+    $('#savePrompt').onclick = () => busy($('#savePrompt'), async () => {
+      const text = $('#promptBox').value.trim();
+      if (!text) return toast('整理方式不能是空的，要回到原本的請按「恢復預設」');
+      state.prompt = await api('savePrompt', { prompt: text });
+      toast('整理方式已儲存 ✓');
+    });
+    $('#resetPrompt').onclick = () => {
+      if (!confirm('確定要恢復成原本的整理方式嗎？你改過的內容會不見。')) return;
+      busy($('#resetPrompt'), async () => {
+        state.prompt = await api('savePrompt', { prompt: '' });
+        $('#promptBox').value = state.prompt.prompt;
+        toast('已恢復預設 ✓');
+      });
+    };
+  }
   $('#logoutBtn').onclick = () => { if (confirm('確定要登出嗎？')) logout(); };
 }
 
