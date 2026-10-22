@@ -106,6 +106,10 @@ label.field { display: block; font-size: 14px; color: var(--muted); margin-botto
 /* 寫日記 */
 .hint { font-size: 14px; color: var(--muted); background: var(--soft); border-radius: 12px; padding: 10px 12px; display: flex; gap: 8px; align-items: flex-start; }
 .raw-peek { font-size: 14px; color: var(--muted); white-space: pre-wrap; background: var(--soft); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+.btn.rec { background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.interim { color: var(--muted); font-size: 15px; min-height: 0; margin-top: 6px; }
 details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
 
 /* 打卡 */
@@ -313,6 +317,7 @@ async function start() {
 
 // ───────── 分頁 ─────────
 document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
+  stopRec();
   state.tab = b.dataset.tab;
   document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('on', x === b));
   window.scrollTo(0, 0);
@@ -375,16 +380,23 @@ function resetDraft() {
 function renderWriteStep() {
   const d = state.draft;
   const box = $('#writeStep');
+  stopRec();
   if (!d.polished) {
     box.innerHTML = `
-      <div class="hint"><span>🎙️</span><span>點下面的框，再按鍵盤右下角的<b>麥克風</b>就能用說的。講完再按「幫我整理」。</span></div>
+      <div class="hint"><span>🎙️</span><span>${SR
+        ? '按「開始說話」就能用說的，講完按「停止」，再按「幫我整理」。也可以用鍵盤上的麥克風。'
+        : '點下面的框，再按鍵盤上的<b>麥克風</b>就能用說的（Mac 按兩下 Fn 鍵）。講完再按「幫我整理」。'}</span></div>
+      ${SR ? '<button class="btn ghost block" id="micBtn" style="margin-top:10px">🎤 開始說話</button>' : ''}
       <textarea id="raw" placeholder="想到什麼就說什麼…" style="margin-top:10px">${esc(d.raw)}</textarea>
+      <div class="interim" id="interim"></div>
       <div class="row" style="margin-top:10px">
         <button class="btn primary" id="polishBtn" style="flex:1">✨ 幫我整理</button>
         <button class="btn ghost" id="saveRawBtn">直接儲存</button>
       </div>`;
     $('#raw').oninput = e => { d.raw = e.target.value; saveDraft(); };
+    if (SR) $('#micBtn').onclick = () => (rec ? stopRec() : startRec());
     $('#polishBtn').onclick = () => busy($('#polishBtn'), async () => {
+      stopRec();
       if (!d.raw.trim()) return toast('先說點什麼吧');
       d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name });
       saveDraft(); renderWriteStep();
@@ -408,6 +420,66 @@ function renderWriteStep() {
     });
     $('#backBtn').onclick = () => { d.polished = ''; saveDraft(); renderWriteStep(); };
   }
+}
+
+// ───────── 語音輸入（瀏覽器內建辨識）─────────
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+
+function startRec() {
+  const r = new SR();
+  r.lang = 'zh-TW';
+  r.continuous = true;
+  r.interimResults = true;
+  r.keep = true;  // 瀏覽器停頓一下就會自己結束，錄音中就自動接著錄
+  r.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) appendRaw(t); else interim += t;
+    }
+    if ($('#interim')) $('#interim').textContent = interim;
+  };
+  r.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    r.keep = false;
+    toast(e.error === 'not-allowed' || e.error === 'service-not-allowed'
+      ? '沒有麥克風權限，請在瀏覽器允許，或改用鍵盤上的麥克風'
+      : '錄音中斷了，請再按一次「開始說話」');
+  };
+  r.onend = () => {
+    if (r.keep && rec === r) { try { r.start(); return; } catch (err) {} }
+    if (rec === r) rec = null;
+    updateMicUI();
+  };
+  try { r.start(); } catch (err) { return toast('這個瀏覽器沒辦法錄音，請改用鍵盤上的麥克風'); }
+  rec = r;
+  updateMicUI();
+}
+
+function stopRec() {
+  if (!rec) return;
+  const r = rec;
+  r.keep = false;
+  rec = null;
+  r.stop();
+  updateMicUI();
+}
+
+function appendRaw(t) {
+  const d = state.draft;
+  d.raw = (d.raw || '').replace(/\s+$/, '') + t.trim();
+  saveDraft();
+  const ta = $('#raw');
+  if (ta) { ta.value = d.raw; ta.scrollTop = ta.scrollHeight; }
+}
+
+function updateMicUI() {
+  const b = $('#micBtn');
+  if ($('#interim') && !rec) $('#interim').textContent = '';
+  if (!b) return;
+  b.classList.toggle('rec', !!rec);
+  b.innerHTML = rec ? '<span class="rec-dot"></span> 錄音中…按這裡停止' : '🎤 開始說話';
 }
 
 async function saveEntry(content, raw) {
