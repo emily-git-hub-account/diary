@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="日記">
+<meta name="theme-color" content="#F7F2EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1A17" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>日記</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F7F2EA;
+  --card: #FFFDF9;
+  --ink: #2F2A25;
+  --muted: #8A8178;
+  --line: #E8DFD3;
+  --soft: #F0E9DF;
+  --accent: #B5683F;
+  --accent-ink: #FFFFFF;
+  --danger: #B54A3F;
+  --shadow: 0 1px 2px rgba(60, 45, 30, .06), 0 4px 16px rgba(60, 45, 30, .05);
+  --serif: "Noto Serif TC", "Songti TC", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1A17; --card: #26231F; --ink: #EDE6DC; --muted: #A39A8F; --line: #3A352F;
+    --soft: #2F2B26; --accent: #E0905F; --accent-ink: #1C1A17; --danger: #E07A6F;
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1C1A17; --card: #26231F; --ink: #EDE6DC; --muted: #A39A8F; --line: #3A352F;
+  --soft: #2F2B26; --accent: #E0905F; --accent-ink: #1C1A17; --danger: #E07A6F;
+  --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--sans);
+  font-size: 16px; line-height: 1.6; min-height: 100vh;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.hidden { display: none !important; }
+
+/* 版面 */
+.wrap { max-width: 640px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px 24px; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 8px 0 18px; }
+h1 { font-family: var(--serif); font-weight: 700; font-size: 28px; line-height: 1.25; margin: 0; letter-spacing: .02em; }
+h2 { font-family: var(--serif); font-weight: 700; font-size: 19px; margin: 0 0 12px; }
+.sub { color: var(--muted); font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.row { display: flex; align-items: center; gap: 8px; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stack > * + * { margin-top: 10px; }
+
+/* 按鈕 */
+.btn { border: 0; border-radius: 12px; padding: 11px 18px; font-weight: 600; background: var(--soft); color: var(--ink); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; border: 1px solid var(--line); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--line); }
+.btn.small { padding: 6px 12px; min-height: 36px; font-size: 14px; border-radius: 10px; }
+.btn:disabled { opacity: .5; }
+.btn.block { width: 100%; }
+.icon-btn { border: 0; background: transparent; padding: 8px; border-radius: 10px; color: var(--muted); min-width: 40px; min-height: 40px; }
+.icon-btn:active { background: var(--soft); }
+
+/* 輸入 */
+textarea, input[type=text], input[type=password], input[type=date] {
+  width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+  padding: 12px 14px; font-size: 17px; outline: none;
+}
+textarea { min-height: 150px; resize: vertical; line-height: 1.7; }
+textarea:focus, input:focus { border-color: var(--accent); }
+label.field { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+
+/* 分類標籤 */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1.5px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 15px; font-size: 15px; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+.chip.on { border-color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 14%, var(--card)); font-weight: 600; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--c); }
+.tag .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+
+/* 日記卡片 */
+.entry { border-top: 1px solid var(--line); padding: 14px 0 10px; }
+.entry:first-child { border-top: 0; padding-top: 2px; }
+.entry-body { white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; }
+.entry-actions { display: flex; gap: 4px; margin-top: 4px; justify-content: flex-end; }
+.day-head { font-family: var(--serif); font-weight: 700; font-size: 16px; margin: 22px 0 4px; display: flex; align-items: baseline; gap: 8px; }
+.day-head .sub { font-family: var(--sans); font-weight: 400; }
+.empty { color: var(--muted); text-align: center; padding: 22px 8px; font-size: 15px; }
+
+/* 寫日記 */
+.hint { font-size: 14px; color: var(--muted); background: var(--soft); border-radius: 12px; padding: 10px 12px; display: flex; gap: 8px; align-items: flex-start; }
+.raw-peek { font-size: 14px; color: var(--muted); white-space: pre-wrap; background: var(--soft); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* 打卡 */
+.check-list { display: flex; flex-direction: column; gap: 8px; }
+.check { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; width: 100%; min-height: 48px; }
+.check .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; flex: none; transition: all .15s; }
+.check.done .box { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.check.done .label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.progress { height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
+
+/* 習慣統計 */
+.habit { padding: 12px 0; border-top: 1px solid var(--line); }
+.habit:first-of-type { border-top: 0; }
+.habit-stats { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.habit-stats b { color: var(--ink); font-size: 15px; }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.dots i { width: 14px; height: 14px; border-radius: 4px; background: var(--soft); }
+.dots i.on { background: var(--accent); }
+.dots i.future { background: transparent; border: 1px dashed var(--line); }
+.dots i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* 月曆 */
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.seg button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 8px; font-weight: 600; color: var(--muted); min-height: 40px; }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal .wd { font-size: 12px; color: var(--muted); padding-bottom: 4px; }
+.cal button { border: 0; background: transparent; border-radius: 10px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 15px; padding: 0; min-height: 40px; }
+.cal button.sel { background: var(--accent); color: var(--accent-ink); }
+.cal button.is-today:not(.sel) { font-weight: 700; color: var(--accent); }
+.cal .mini { display: flex; gap: 2px; height: 5px; }
+.cal .mini i { width: 5px; height: 5px; border-radius: 50%; background: var(--c); }
+.cal button.sel .mini i { background: var(--accent-ink); }
+
+/* 設定 */
+.cat-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.cat-row:first-child { border-top: 0; }
+.cat-row input[type=text] { padding: 8px 10px; font-size: 16px; }
+.cat-row input[type=color] { width: 36px; height: 36px; border: 0; padding: 0; background: none; border-radius: 50%; flex: none; }
+.cat-row.off input[type=text] { color: var(--muted); text-decoration: line-through; }
+
+/* 底部分頁 */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line); display: flex; justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav.tabs .in { display: flex; max-width: 640px; width: 100%; }
+nav.tabs button { flex: 1; border: 0; background: transparent; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); min-height: 60px; }
+nav.tabs button svg { width: 24px; height: 24px; }
+nav.tabs button.on { color: var(--accent); font-weight: 600; }
+
+/* 登入 */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.login .card { width: 100%; max-width: 380px; text-align: center; padding: 28px 22px; }
+
+/* 提示訊息 */
+.toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-size: 15px; opacity: 0; transition: all .25s; z-index: 50; max-width: calc(100% - 32px); text-align: center; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-page { text-align: center; color: var(--muted); padding: 40px 0; }
+
+/* 彈窗 */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--card); width: 100%; max-width: 640px; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); max-height: 92vh; overflow-y: auto; }
+@media (min-width: 700px) { .sheet-bg { align-items: center; } .sheet { border-radius: 20px; } }
+.item-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <div class="card stack">
+    <div style="font-size:40px">📔</div>
+    <h1>我的日記</h1>
+    <p class="sub" style="margin:0">請輸入密碼</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="密碼">
+    <button id="loginBtn" class="btn primary block">進入</button>
+    <p id="loginErr" class="sub" style="color:var(--danger);margin:0"></p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <main class="wrap" id="view"></main>
+  <nav class="tabs"><div class="in">
+    <button data-tab="today" class="on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>今天</button>
+    <button data-tab="review">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/><path d="M9 7h6M9 11h4"/></svg>回顧</button>
+    <button data-tab="habits">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="m8 13 3 3 5-6"/></svg>清單</button>
+    <button data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>設定</button>
+  </div></nav>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// 後端網址（Apps Script 網頁應用程式）。這不是秘密，真正的保護是密碼。
+const API_URL = 'https://script.google.com/macros/s/AKfycbxXSQWkDSegS3QCSh50-WP7I8nixUKfDKMEjsskvYDowQQOlX689Atvmq7kmDfn26Cq/exec';
+
+// ───────── 共用 ─────────
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+const WD = ['日', '一', '二', '三', '四', '五', '六'];
+const prettyDate = s => { const d = parse(s); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WD[d.getDay()]}`; };
+const monthOf = s => s.slice(0, 7);
+const daysBetween = (a, b) => Math.round((parse(b) - parse(a)) / 86400000);
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function api(action, payload = {}) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, password: state.password, ...payload }),
+  });
+  const j = await res.json();
+  if (!j.ok) {
+    if (j.auth && action !== 'login') logout(j.error);
+    throw new Error(j.error || '發生錯誤');
+  }
+  return j.data;
+}
+
+async function busy(btn, fn) {
+  const html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  try { return await fn(); }
+  catch (e) { toast(e.message.includes('fetch') ? '網路連線失敗，請稍後再試' : e.message); }
+  finally { btn.disabled = false; btn.innerHTML = html; }
+}
+
+// ───────── 狀態 ─────────
+const state = {
+  password: store.get('pw', ''),
+  tab: 'today',
+  categories: [],
+  lists: [],
+  months: {},        // 'YYYY-MM' → entries
+  checks: {},        // listId → { date: [itemIds] }
+  date: today(),
+  draft: store.get('draft', null) || { date: today(), categoryId: '', raw: '', polished: '', id: '' },
+  review: { mode: 'date', month: monthOf(today()), day: '', categoryId: '' },
+};
+const catById = id => state.categories.find(c => c.id === id) || { name: '（已刪除的分類）', color: '#999' };
+const activeCats = () => state.categories.filter(c => c.active);
+const saveDraft = () => store.set('draft', state.draft);
+
+async function loadMonth(ym, force) {
+  if (state.months[ym] && !force) return state.months[ym];
+  const list = await api('getEntries', { from: ym + '-01', to: ym + '-31' });
+  state.months[ym] = list;
+  return list;
+}
+async function loadChecks(listId, force) {
+  if (state.checks[listId] && !force) return state.checks[listId];
+  state.checks[listId] = await api('getChecks', { listId });
+  return state.checks[listId];
+}
+const listsOn = date => state.lists.filter(l => l.start <= date && date <= l.end);
+
+// ───────── 登入 ─────────
+function logout(msg) {
+  state.password = ''; store.del('pw');
+  $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
+  $('#loginErr').textContent = msg || '';
+}
+$('#loginBtn').onclick = () => busy($('#loginBtn'), async () => {
+  state.password = $('#pw').value.trim();
+  try { await api('login'); }
+  catch (e) { $('#loginErr').textContent = e.message.includes('fetch') ? '網路連線失敗，請稍後再試' : e.message; return; }
+  store.set('pw', state.password); $('#pw').value = '';
+  await start();
+});
+$('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginBtn').click(); });
+
+async function start() {
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#view').innerHTML = '<div class="loading-page"><span class="spin"></span></div>';
+  try {
+    const d = await api('init');
+    state.categories = d.categories; state.lists = d.lists;
+    render();
+  } catch (e) {
+    $('#view').innerHTML = `<div class="empty">載入失敗：${esc(e.message)}<br><br><button class="btn" onclick="start()">再試一次</button></div>`;
+  }
+}
+
+// ───────── 分頁 ─────────
+document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
+  state.tab = b.dataset.tab;
+  document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  window.scrollTo(0, 0);
+  render();
+});
+function render() { ({ today: renderToday, review: renderReview, habits: renderHabits, settings: renderSettings })[state.tab](); }
+
+// ───────── 今天 ─────────
+async function renderToday() {
+  const v = $('#view');
+  const d = state.draft;
+  if (!d.categoryId || !activeCats().some(c => c.id === d.categoryId)) d.categoryId = activeCats()[0]?.id || '';
+  if (!d.id) d.date = state.date;
+  const isToday = state.date === today();
+
+  v.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="sub">${isToday ? '今天' : '補寫'}</div>
+        <h1>${prettyDate(state.date)}</h1>
+      </div>
+      <label class="btn ghost small" style="position:relative">換日期
+        <input type="date" id="pickDate" value="${state.date}" max="${today()}" style="position:absolute;inset:0;opacity:0;width:100%">
+      </label>
+    </div>
+    <div id="todayChecks"></div>
+    <section class="card stack" id="writer">
+      <div class="spread"><h2 style="margin:0">${d.id ? '修改日記' : '寫日記'}</h2>
+        ${d.id ? '<button class="btn small ghost" id="cancelEdit">取消修改</button>' : ''}</div>
+      <div>
+        <label class="field">先選要記錄的分類</label>
+        <div class="chips" id="catChips">${activeCats().map(c => `
+          <button class="chip ${c.id === d.categoryId ? 'on' : ''}" data-id="${c.id}" style="--c:${c.color}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('')}
+        </div>
+      </div>
+      <div id="writeStep"></div>
+    </section>
+    <section class="card">
+      <h2>${isToday ? '今天' : '這天'}寫下的</h2>
+      <div id="dayEntries"><div class="loading-page"><span class="spin"></span></div></div>
+    </section>`;
+
+  $('#pickDate').onchange = e => { if (e.target.value) { state.date = e.target.value; renderToday(); } };
+  $('#catChips').onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    d.categoryId = b.dataset.id; saveDraft();
+    document.querySelectorAll('#catChips .chip').forEach(x => x.classList.toggle('on', x === b));
+  };
+  if ($('#cancelEdit')) $('#cancelEdit').onclick = () => { resetDraft(); renderToday(); };
+  renderWriteStep();
+  renderTodayChecks();
+  renderDayEntries();
+}
+
+function resetDraft() {
+  state.draft = { date: state.date, categoryId: state.draft.categoryId, raw: '', polished: '', id: '' };
+  saveDraft();
+}
+
+function renderWriteStep() {
+  const d = state.draft;
+  const box = $('#writeStep');
+  if (!d.polished) {
+    box.innerHTML = `
+      <div class="hint"><span>🎙️</span><span>點下面的框，再按鍵盤右下角的<b>麥克風</b>就能用說的。講完再按「幫我整理」。</span></div>
+      <textarea id="raw" placeholder="想到什麼就說什麼…" style="margin-top:10px">${esc(d.raw)}</textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="polishBtn" style="flex:1">✨ 幫我整理</button>
+        <button class="btn ghost" id="saveRawBtn">直接儲存</button>
+      </div>`;
+    $('#raw').oninput = e => { d.raw = e.target.value; saveDraft(); };
+    $('#polishBtn').onclick = () => busy($('#polishBtn'), async () => {
+      if (!d.raw.trim()) return toast('先說點什麼吧');
+      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name });
+      saveDraft(); renderWriteStep();
+    });
+    $('#saveRawBtn').onclick = () => busy($('#saveRawBtn'), () => saveEntry(d.raw.trim(), d.raw.trim()));
+  } else {
+    box.innerHTML = `
+      <label class="field">整理好了，可以直接修改</label>
+      <textarea id="polished">${esc(d.polished)}</textarea>
+      <details><summary>看我原本說的話</summary><div class="raw-peek">${esc(d.raw)}</div></details>
+      <div class="row" style="margin-top:6px">
+        <button class="btn primary" id="saveBtn" style="flex:1">儲存</button>
+        <button class="btn ghost" id="redoBtn">重新整理</button>
+        <button class="btn ghost" id="backBtn">回原文</button>
+      </div>`;
+    $('#polished').oninput = e => { d.polished = e.target.value; saveDraft(); };
+    $('#saveBtn').onclick = () => busy($('#saveBtn'), () => saveEntry(d.polished.trim(), d.raw));
+    $('#redoBtn').onclick = () => busy($('#redoBtn'), async () => {
+      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name });
+      saveDraft(); renderWriteStep();
+    });
+    $('#backBtn').onclick = () => { d.polished = ''; saveDraft(); renderWriteStep(); };
+  }
+}
+
+async function saveEntry(content, raw) {
+  const d = state.draft;
+  if (!content) return toast('內容是空的');
+  if (!d.categoryId) return toast('請先選分類');
+  const cat = catById(d.categoryId);
+  await api('saveEntry', { entry: { id: d.id, date: d.date, categoryId: d.categoryId, categoryName: cat.name, content, raw } });
+  delete state.months[monthOf(d.date)];
+  state.byCat = {};
+  toast(d.id ? '已更新 ✓' : '已儲存 ✓');
+  resetDraft();
+  renderToday();
+}
+
+async function renderDayEntries() {
+  const box = $('#dayEntries');
+  try {
+    const date = state.date;
+    const list = (await loadMonth(monthOf(date))).filter(e => e.date === date);
+    if (state.tab !== 'today' || date !== state.date) return;
+    box.innerHTML = list.length ? list.map(entryHtml).join('') : '<div class="empty">還沒有內容，寫下第一則吧 🌱</div>';
+    bindEntryActions(box, list, () => renderDayEntries());
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+function entryHtml(e, showDate) {
+  const c = catById(e.categoryId);
+  return `<article class="entry" data-id="${e.id}">
+    <div class="spread"><span class="tag" style="--c:${c.color}"><span class="dot"></span>${esc(c.name)}</span>
+      ${showDate ? `<span class="sub">${prettyDate(e.date)}</span>` : ''}</div>
+    <p class="entry-body">${esc(e.content)}</p>
+    <div class="entry-actions">
+      <button class="icon-btn" data-act="edit" aria-label="修改">修改</button>
+      <button class="icon-btn" data-act="del" aria-label="刪除">刪除</button>
+    </div>
+  </article>`;
+}
+
+function bindEntryActions(box, list, refresh) {
+  box.onclick = async ev => {
+    const btn = ev.target.closest('[data-act]'); if (!btn) return;
+    const e = list.find(x => x.id === btn.closest('.entry').dataset.id); if (!e) return;
+    if (btn.dataset.act === 'edit') {
+      state.date = e.date;
+      state.draft = { id: e.id, date: e.date, categoryId: e.categoryId, raw: e.raw || e.content, polished: e.content };
+      saveDraft();
+      state.tab = 'today';
+      document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'today'));
+      renderToday(); window.scrollTo(0, 0);
+    } else if (confirm('確定要刪除這則日記嗎？刪除後無法復原。')) {
+      await busy(btn, async () => {
+        await api('deleteEntry', { id: e.id });
+        delete state.months[monthOf(e.date)]; state.byCat = {};
+        toast('已刪除'); refresh();
+      });
+    }
+  };
+}
+
+// 今天頁的打卡
+async function renderTodayChecks() {
+  const box = $('#todayChecks');
+  const date = state.date;
+  const lists = listsOn(date);
+  if (!lists.length) {
+    box.innerHTML = state.lists.length ? '' : `<section class="card spread"><span class="sub">還沒有要追蹤的清單</span><button class="btn small" id="goHabits">建立清單</button></section>`;
+    if ($('#goHabits')) $('#goHabits').onclick = () => document.querySelector('[data-tab=habits]').click();
+    return;
+  }
+  box.innerHTML = lists.map(l => `<section class="card" data-list="${l.id}"><div class="loading-page" style="padding:10px"><span class="spin"></span></div></section>`).join('');
+  for (const l of lists) {
+    try { await loadChecks(l.id); } catch (e) { continue; }
+    if (state.tab !== 'today' || date !== state.date) return;
+    drawCheckCard(box.querySelector(`[data-list="${l.id}"]`), l, date);
+  }
+}
+
+function drawCheckCard(el, list, date) {
+  const done = state.checks[list.id][date] || [];
+  const n = list.items.filter(i => done.includes(i.id)).length;
+  el.innerHTML = `
+    <div class="spread" style="margin-bottom:10px"><h2 style="margin:0">${esc(list.name)}</h2><span class="sub">${n} / ${list.items.length}</span></div>
+    <div class="progress" style="margin-bottom:12px"><i style="width:${list.items.length ? n / list.items.length * 100 : 0}%"></i></div>
+    <div class="check-list">${list.items.map(i => `
+      <button class="check ${done.includes(i.id) ? 'done' : ''}" data-item="${i.id}">
+        <span class="box">${done.includes(i.id) ? '✓' : ''}</span><span class="label">${esc(i.name)}</span>
+      </button>`).join('')}</div>`;
+  el.querySelector('.check-list').onclick = async ev => {
+    const b = ev.target.closest('.check'); if (!b) return;
+    const cur = state.checks[list.id][date] || [];
+    const next = cur.includes(b.dataset.item) ? cur.filter(x => x !== b.dataset.item) : [...cur, b.dataset.item];
+    state.checks[list.id][date] = next;
+    drawCheckCard(el, list, date);
+    try { await api('setCheck', { date, listId: list.id, done: next }); }
+    catch (e) { state.checks[list.id][date] = cur; drawCheckCard(el, list, date); toast('沒存到，請再按一次'); }
+  };
+}
+
+// ───────── 回顧 ─────────
+async function renderReview() {
+  const r = state.review;
+  $('#view').innerHTML = `
+    <div class="page-head"><h1>回顧</h1></div>
+    <div class="seg"><button data-mode="date" class="${r.mode === 'date' ? 'on' : ''}">依日期</button><button data-mode="cat" class="${r.mode === 'cat' ? 'on' : ''}">依分類</button></div>
+    <div id="reviewBody"></div>`;
+  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { r.mode = b.dataset.mode; renderReview(); });
+  r.mode === 'date' ? renderByDate() : renderByCat();
+}
+
+async function renderByDate() {
+  const r = state.review;
+  const body = $('#reviewBody');
+  const [y, m] = r.month.split('-').map(Number);
+  body.innerHTML = `
+    <section class="card">
+      <div class="spread" style="margin-bottom:10px">
+        <button class="icon-btn" id="prevM" aria-label="上個月">‹</button>
+        <h2 style="margin:0">${y} 年 ${m} 月</h2>
+        <button class="icon-btn" id="nextM" aria-label="下個月" ${r.month >= monthOf(today()) ? 'disabled' : ''}>›</button>
+      </div>
+      <div id="calBox"><div class="loading-page"><span class="spin"></span></div></div>
+    </section>
+    <div id="monthList"></div>`;
+  const shift = n => { const d = new Date(y, m - 1 + n, 1); r.month = ymd(d).slice(0, 7); r.day = ''; renderByDate(); };
+  $('#prevM').onclick = () => shift(-1);
+  $('#nextM').onclick = () => shift(1);
+
+  let list;
+  try { list = await loadMonth(r.month); } catch (e) { $('#calBox').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (state.tab !== 'review' || r.mode !== 'date' || r.month !== `${y}-${pad(m)}`) return;
+
+  const byDay = {};
+  list.forEach(e => (byDay[e.date] = byDay[e.date] || []).push(e));
+  const first = new Date(y, m - 1, 1).getDay();
+  const days = new Date(y, m, 0).getDate();
+  let cells = WD.map(w => `<div class="wd">${w}</div>`).join('') + '<div></div>'.repeat(first);
+  for (let i = 1; i <= days; i++) {
+    const ds = `${r.month}-${pad(i)}`;
+    const cats = [...new Set((byDay[ds] || []).map(e => e.categoryId))].slice(0, 4);
+    cells += `<button data-day="${ds}" class="${ds === r.day ? 'sel' : ''} ${ds === today() ? 'is-today' : ''}">${i}
+      <span class="mini">${cats.map(c => `<i style="--c:${catById(c).color}"></i>`).join('')}</span></button>`;
+  }
+  $('#calBox').innerHTML = `<div class="cal">${cells}</div>`;
+  $('#calBox').onclick = ev => {
+    const b = ev.target.closest('[data-day]'); if (!b) return;
+    r.day = r.day === b.dataset.day ? '' : b.dataset.day; renderByDate();
+  };
+
+  const dates = Object.keys(byDay).filter(d => !r.day || d === r.day).sort().reverse();
+  const ml = $('#monthList');
+  if (!dates.length) {
+    ml.innerHTML = `<div class="empty">${r.day ? '這天沒有日記' : '這個月還沒有日記'}</div>`;
+    return;
+  }
+  ml.innerHTML = (r.day ? `<div class="spread"><span></span><button class="btn small ghost" id="allMonth">看整個月</button></div>` : '') +
+    dates.map(ds => `<div class="day-head">${prettyDate(ds)}<span class="sub">${byDay[ds].length} 則</span></div>
+      <section class="card" style="padding-top:12px;padding-bottom:6px">${byDay[ds].map(e => entryHtml(e)).join('')}</section>`).join('');
+  if ($('#allMonth')) $('#allMonth').onclick = () => { r.day = ''; renderByDate(); };
+  bindEntryActions(ml, list, () => renderByDate());
+}
+
+async function renderByCat() {
+  const r = state.review;
+  if (!r.categoryId || !state.categories.some(c => c.id === r.categoryId)) r.categoryId = state.categories[0]?.id || '';
+  const body = $('#reviewBody');
+  body.innerHTML = `
+    <div class="chips" id="revCats" style="margin-bottom:16px">${state.categories.map(c => `
+      <button class="chip ${c.id === r.categoryId ? 'on' : ''}" data-id="${c.id}" style="--c:${c.color}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('')}</div>
+    <div id="catList"><div class="loading-page"><span class="spin"></span></div></div>`;
+  $('#revCats').onclick = e => { const b = e.target.closest('.chip'); if (b) { r.categoryId = b.dataset.id; renderByCat(); } };
+
+  const cid = r.categoryId;
+  state.byCat = state.byCat || {};
+  let list;
+  try { list = state.byCat[cid] || (state.byCat[cid] = await api('getEntriesByCategory', { categoryId: cid })); }
+  catch (e) { $('#catList').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (state.tab !== 'review' || r.mode !== 'cat' || r.categoryId !== cid) return;
+  list = [...list].sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+  const box = $('#catList');
+  box.innerHTML = list.length
+    ? `<p class="sub" style="margin:0 0 8px">共 ${list.length} 則</p><section class="card" style="padding-top:12px;padding-bottom:6px">${list.map(e => entryHtml(e, true)).join('')}</section>`
+    : '<div class="empty">這個分類還沒有日記</div>';
+  bindEntryActions(box, list, () => { delete state.byCat[cid]; renderByCat(); });
+}
+
+// ───────── 清單 ─────────
+async function renderHabits() {
+  const t = today();
+  const current = state.lists.filter(l => l.end >= t).sort((a, b) => a.start.localeCompare(b.start));
+  const past = state.lists.filter(l => l.end < t).sort((a, b) => b.end.localeCompare(a.end));
+  $('#view').innerHTML = `
+    <div class="page-head"><div><h1>清單</h1><div class="sub">設定一段期間要做的事，每天打勾</div></div>
+      <button class="btn primary small" id="newList">＋ 新清單</button></div>
+    <div id="curLists">${current.length ? '' : '<div class="card empty">還沒有進行中的清單<br>按右上角「＋ 新清單」開始</div>'}</div>
+    ${past.length ? '<h2 style="margin-top:28px">已結束</h2><div id="pastLists"></div>' : ''}`;
+  $('#newList').onclick = () => openListEditor();
+  const draw = async (l, parent) => {
+    const el = document.createElement('section'); el.className = 'card'; parent.appendChild(el);
+    el.innerHTML = '<div class="loading-page" style="padding:10px"><span class="spin"></span></div>';
+    try { await loadChecks(l.id); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+    drawHabitCard(el, l);
+  };
+  for (const l of current) draw(l, $('#curLists'));
+  for (const l of past) draw(l, $('#pastLists'));
+}
+
+function drawHabitCard(el, l) {
+  const t = today();
+  const checks = state.checks[l.id] || {};
+  const total = daysBetween(l.start, l.end) + 1;
+  const lastDay = t < l.end ? t : l.end;
+  const elapsed = t < l.start ? 0 : daysBetween(l.start, lastDay) + 1;
+  const status = t < l.start ? `${prettyDate(l.start)} 開始` : t > l.end ? '已結束' : `第 ${elapsed} 天，共 ${total} 天`;
+  const allDays = Array.from({ length: total }, (_, i) => addDays(l.start, i));
+
+  const habits = l.items.map(item => {
+    const doneOn = d => (checks[d] || []).includes(item.id);
+    const count = allDays.filter(d => d <= lastDay && doneOn(d)).length;
+    let streak = 0, d = lastDay;
+    if (!doneOn(d) && d === t) d = addDays(d, -1);
+    while (d >= l.start && doneOn(d)) { streak++; d = addDays(d, -1); }
+    const rate = elapsed ? Math.round(count / elapsed * 100) : 0;
+    return `<div class="habit">
+      <div class="spread"><b>${esc(item.name)}</b></div>
+      <div class="habit-stats"><span>完成 <b>${count}</b> 天</span><span>完成率 <b>${rate}%</b></span><span>連續 <b>${streak}</b> 天</span></div>
+      <div class="dots">${allDays.map(d => `<i class="${d > t ? 'future' : doneOn(d) ? 'on' : ''} ${d === t ? 'today' : ''}" title="${d}"></i>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="spread"><h2 style="margin:0">${esc(l.name)}</h2><button class="btn small ghost" data-edit>編輯</button></div>
+    <p class="sub" style="margin:2px 0 6px">${l.start.replace(/-/g, '/')} – ${l.end.replace(/-/g, '/')}・${status}</p>
+    ${habits}`;
+  el.querySelector('[data-edit]').onclick = () => openListEditor(l);
+}
+
+function openListEditor(list) {
+  const isNew = !list;
+  const t = today();
+  const l = list ? JSON.parse(JSON.stringify(list)) : { name: '', start: t, end: addDays(t, 29), items: [] };
+  const bg = document.createElement('div'); bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet stack">
+    <div class="spread"><h2 style="margin:0">${isNew ? '新清單' : '編輯清單'}</h2><button class="icon-btn" data-close aria-label="關閉">✕</button></div>
+    <div><label class="field">名稱</label><input type="text" id="lName" value="${esc(l.name)}" placeholder="例如：十一月好習慣"></div>
+    <div class="row">
+      <div style="flex:1"><label class="field">開始</label><input type="date" id="lStart" value="${l.start}"></div>
+      <div style="flex:1"><label class="field">結束</label><input type="date" id="lEnd" value="${l.end}"></div>
+    </div>
+    <div><label class="field">要做的事</label><div id="lItems"></div>
+      <button class="btn small ghost" id="addItem">＋ 加一項</button></div>
+    <div class="row" style="padding-top:8px">
+      ${isNew ? '' : '<button class="btn danger" id="delList">刪除</button>'}
+      <button class="btn primary" id="saveList" style="flex:1">儲存</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.onclick = e => { if (e.target === bg || e.target.closest('[data-close]')) close(); };
+  const items = bg.querySelector('#lItems');
+  const addRow = (it = { id: '', name: '' }) => {
+    const row = document.createElement('div'); row.className = 'item-row'; row.dataset.id = it.id;
+    row.innerHTML = `<input type="text" value="${esc(it.name)}" placeholder="例如：早上喝一杯水"><button class="icon-btn" aria-label="移除">✕</button>`;
+    row.querySelector('button').onclick = () => row.remove();
+    items.appendChild(row);
+    return row;
+  };
+  (l.items.length ? l.items : [{}, {}, {}]).forEach(addRow);
+  bg.querySelector('#addItem').onclick = () => addRow().querySelector('input').focus();
+  bg.querySelector('#saveList').onclick = e => busy(e.currentTarget, async () => {
+    const out = {
+      id: l.id, name: bg.querySelector('#lName').value.trim(),
+      start: bg.querySelector('#lStart').value, end: bg.querySelector('#lEnd').value,
+      items: [...items.children].map(r => ({ id: r.dataset.id || Math.random().toString(36).slice(2, 10), name: r.querySelector('input').value.trim() })).filter(i => i.name),
+    };
+    if (!out.name) return toast('請取個名稱');
+    if (!out.start || !out.end || out.end < out.start) return toast('結束日要在開始日之後');
+    if (!out.items.length) return toast('至少要有一項');
+    state.lists = await api('saveList', { list: out });
+    toast('已儲存 ✓'); close(); render();
+  });
+  if (!isNew) bg.querySelector('#delList').onclick = e => {
+    if (!confirm(`確定要刪除「${l.name}」嗎？打卡紀錄會留在試算表，但 App 裡就看不到了。`)) return;
+    busy(e.currentTarget, async () => {
+      await api('deleteList', { id: l.id });
+      state.lists = state.lists.filter(x => x.id !== l.id);
+      toast('已刪除'); close(); render();
+    });
+  };
+}
+
+// ───────── 設定 ─────────
+function renderSettings() {
+  const cats = JSON.parse(JSON.stringify(state.categories));
+  $('#view').innerHTML = `
+    <div class="page-head"><h1>設定</h1></div>
+    <section class="card">
+      <h2>日記分類</h2>
+      <p class="sub" style="margin:-6px 0 10px">隱藏的分類不會出現在寫日記的選項，但舊日記還在。</p>
+      <div id="catRows"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost" id="addCat">＋ 新增分類</button>
+        <button class="btn primary" id="saveCats" style="flex:1">儲存分類</button>
+      </div>
+    </section>
+    <section class="card stack">
+      <h2>加到手機主畫面</h2>
+      <p class="sub" style="margin:0">Safari：點下方「分享」圖示 → 「加入主畫面」。<br>Chrome：點網址列右邊的「分享」圖示 → 「加入主畫面」。</p>
+    </section>
+    <section class="card"><button class="btn danger block" id="logoutBtn">登出這支裝置</button></section>`;
+  const rows = $('#catRows');
+  const palette = ['#C8794F', '#6F8FAF', '#D4A23C', '#6E9A78', '#A0729B', '#C25E6E', '#5E9C9C', '#8C7B5E'];
+  const draw = () => {
+    rows.innerHTML = cats.map((c, i) => `
+      <div class="cat-row ${c.active ? '' : 'off'}" data-i="${i}">
+        <input type="color" value="${c.color}" data-k="color" aria-label="顏色">
+        <input type="text" value="${esc(c.name)}" data-k="name">
+        <button class="icon-btn" data-a="up" aria-label="往上" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="icon-btn" data-a="toggle" style="font-size:13px;min-width:48px">${c.active ? '隱藏' : '顯示'}</button>
+      </div>`).join('');
+  };
+  draw();
+  rows.oninput = e => { const i = e.target.closest('.cat-row').dataset.i; cats[i][e.target.dataset.k] = e.target.value; };
+  rows.onclick = e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const i = Number(b.closest('.cat-row').dataset.i);
+    if (b.dataset.a === 'up' && i > 0) [cats[i - 1], cats[i]] = [cats[i], cats[i - 1]];
+    if (b.dataset.a === 'toggle') cats[i].active = !cats[i].active;
+    draw();
+  };
+  $('#addCat').onclick = () => {
+    cats.push({ id: '', name: '', color: palette[cats.length % palette.length], active: true });
+    draw(); rows.lastElementChild.querySelector('input[type=text]').focus();
+  };
+  $('#saveCats').onclick = () => busy($('#saveCats'), async () => {
+    const clean = cats.filter(c => c.name.trim()).map(c => ({ ...c, name: c.name.trim() }));
+    if (!clean.some(c => c.active)) return toast('至少要留一個顯示中的分類');
+    state.categories = await api('saveCategories', { categories: clean });
+    toast('分類已儲存 ✓'); renderSettings();
+  });
+  $('#logoutBtn').onclick = () => { if (confirm('確定要登出嗎？')) logout(); };
+}
+
+// ───────── 開始 ─────────
+if (state.password) start(); else logout();
+</script>
+</body>
+</html>
