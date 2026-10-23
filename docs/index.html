@@ -124,6 +124,18 @@ label.field { display: block; font-size: 14px; color: var(--muted); margin-botto
 .bar i { display: block; height: 100%; border-radius: 99px; min-width: 2px; }
 .hist-row { width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; display: flex; justify-content: space-between; align-items: center; padding: 12px 0; min-height: 48px; text-align: left; }
 .hist-row:first-child { border-top: 0; }
+.cat-desc { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 8%, var(--card)); border-radius: 0 10px 10px 0; font-size: 15px; }
+.habit-name { font-size: 17px; }
+.habit-card .habit-stats { margin: 8px 0 10px; }
+.hgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 300px; }
+.hgrid .wd { font-size: 11px; color: var(--muted); text-align: center; }
+.hgrid i { aspect-ratio: 1; border-radius: 6px; background: var(--soft); }
+.hgrid i[data-d] { cursor: pointer; }
+.hgrid i.on { background: var(--accent); }
+.hgrid i.off { background: transparent; border: 1px dotted var(--line); }
+.hgrid i.na { background: transparent; }
+.hgrid i.future { background: transparent; border: 1px dashed var(--line); }
+.hgrid i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
 details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
 
 /* 打卡 */
@@ -136,15 +148,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding
 .progress > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
 
 /* 習慣統計 */
-.habit { padding: 12px 0; border-top: 1px solid var(--line); }
-.habit:first-of-type { border-top: 0; }
-.habit-stats { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.habit-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
 .habit-stats b { color: var(--ink); font-size: 15px; }
-.dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.dots i { width: 14px; height: 14px; border-radius: 4px; background: var(--soft); }
-.dots i.on { background: var(--accent); }
-.dots i.future { background: transparent; border: 1px dashed var(--line); }
-.dots i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
 
 /* 月曆 */
 .seg { display: flex; background: var(--soft); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
@@ -160,11 +165,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding
 .cal button.sel .mini i { background: var(--accent-ink); }
 
 /* 設定 */
-.cat-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
-.cat-row:first-child { border-top: 0; }
+.cat-item { padding: 10px 0; border-top: 1px solid var(--line); }
+.cat-item:first-child { border-top: 0; }
+.cat-item textarea { min-height: 0; margin-top: 6px; padding: 8px 10px; font-size: 15px; }
+.cat-row { display: flex; align-items: center; gap: 8px; }
 .cat-row input[type=text] { padding: 8px 10px; font-size: 16px; }
 .cat-row input[type=color] { width: 36px; height: 36px; border: 0; padding: 0; background: none; border-radius: 50%; flex: none; }
-.cat-row.off input[type=text] { color: var(--muted); text-decoration: line-through; }
+.cat-item.off input[type=text] { color: var(--muted); text-decoration: line-through; }
 
 /* 底部分頁 */
 nav.tabs {
@@ -279,10 +286,10 @@ const state = {
   password: store.get('pw', ''),
   tab: 'today',
   categories: [],
-  lists: [],
+  habits: null,      // 後端還沒更新時是 null
   months: {},        // 'YYYY-MM' → entries
   summaries: {},     // 'YYYY-MM' → { date: summary }
-  checks: {},        // listId → { date: [itemIds] }
+  habitChecks: {},   // habitId → Set(dates)
   date: today(),
   draft: store.get('draft', null) || { date: today(), categoryId: '', raw: '', polished: '', id: '' },
   review: { mode: 'date', month: monthOf(today()), day: '', categoryId: '' },
@@ -304,13 +311,6 @@ async function loadSummaries(ym) {
   catch (e) { if (!/部署新版本/.test(e.message)) throw e; }  // 後端還沒部署新版時當作沒有
   return (state.summaries[ym] = map);
 }
-async function loadChecks(listId, force) {
-  if (state.checks[listId] && !force) return state.checks[listId];
-  state.checks[listId] = await api('getChecks', { listId });
-  return state.checks[listId];
-}
-const listsOn = date => state.lists.filter(l => l.start <= date && date <= l.end);
-
 // ───────── 登入 ─────────
 function logout(msg) {
   state.password = ''; store.del('pw');
@@ -331,7 +331,9 @@ async function start() {
   $('#view').innerHTML = '<div class="loading-page"><span class="spin"></span></div>';
   try {
     const d = await api('init');
-    state.categories = d.categories; state.lists = d.lists; state.prompt = d.prompt || null;
+    state.categories = d.categories; state.habits = d.habits || null;
+    state.habitChecks = {};
+    Object.entries(d.habitChecks || {}).forEach(([id, dates]) => state.habitChecks[id] = new Set(dates)); state.prompt = d.prompt || null;
     state.entryDates = d.entryDates ? new Set(d.entryDates) : null;
     render();
   } catch (e) {
@@ -389,6 +391,7 @@ async function renderToday() {
         <div class="chips" id="catChips">${activeCats().map(c => `
           <button class="chip ${c.id === d.categoryId ? 'on' : ''}" data-id="${c.id}" style="--c:${c.color}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('')}
         </div>
+        <div id="catDesc"></div>
       </div>
       <div id="writeStep"></div>
     </section>
@@ -403,12 +406,19 @@ async function renderToday() {
     const b = e.target.closest('.chip'); if (!b) return;
     d.categoryId = b.dataset.id; saveDraft();
     document.querySelectorAll('#catChips .chip').forEach(x => x.classList.toggle('on', x === b));
+    showCatDesc();
   };
+  showCatDesc();
   if ($('#cancelEdit')) $('#cancelEdit').onclick = () => { resetDraft(); renderToday(); };
   renderWriteStep();
   renderTodayChecks();
   renderDayEntries();
   renderSummary();
+}
+
+function showCatDesc() {
+  const c = catById(state.draft.categoryId);
+  $('#catDesc').innerHTML = c.desc ? `<div class="cat-desc" style="--c:${c.color}">${esc(c.desc)}</div>` : '';
 }
 
 function resetDraft() {
@@ -437,7 +447,7 @@ function renderWriteStep() {
     $('#polishBtn').onclick = () => busy($('#polishBtn'), async () => {
       stopRec();
       if (!d.raw.trim()) return toast('先說點什麼吧');
-      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name });
+      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name, categoryDesc: catById(d.categoryId).desc || '' });
       saveDraft(); renderWriteStep();
     });
     $('#saveRawBtn').onclick = () => busy($('#saveRawBtn'), () => saveEntry(d.raw.trim(), d.raw.trim()));
@@ -454,7 +464,7 @@ function renderWriteStep() {
     $('#polished').oninput = e => { d.polished = e.target.value; saveDraft(); };
     $('#saveBtn').onclick = () => busy($('#saveBtn'), () => saveEntry(d.polished.trim(), d.raw));
     $('#redoBtn').onclick = () => busy($('#redoBtn'), async () => {
-      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name });
+      d.polished = await api('polish', { text: d.raw, categoryName: catById(d.categoryId).name, categoryDesc: catById(d.categoryId).desc || '' });
       saveDraft(); renderWriteStep();
     });
     $('#backBtn').onclick = () => { d.polished = ''; saveDraft(); renderWriteStep(); };
@@ -604,45 +614,6 @@ function bindEntryActions(box, list, refresh) {
         toast('已刪除'); refresh();
       });
     }
-  };
-}
-
-// 今天頁的打卡
-async function renderTodayChecks() {
-  const box = $('#todayChecks');
-  const date = state.date;
-  const lists = listsOn(date);
-  if (!lists.length) {
-    box.innerHTML = state.lists.length ? '' : `<section class="card spread"><span class="sub">還沒有要追蹤的清單</span><button class="btn small" id="goHabits">建立清單</button></section>`;
-    if ($('#goHabits')) $('#goHabits').onclick = () => document.querySelector('[data-tab=habits]').click();
-    return;
-  }
-  box.innerHTML = lists.map(l => `<section class="card" data-list="${l.id}"><div class="loading-page" style="padding:10px"><span class="spin"></span></div></section>`).join('');
-  for (const l of lists) {
-    try { await loadChecks(l.id); } catch (e) { continue; }
-    if (state.tab !== 'today' || date !== state.date) return;
-    drawCheckCard(box.querySelector(`[data-list="${l.id}"]`), l, date);
-  }
-}
-
-function drawCheckCard(el, list, date) {
-  const done = state.checks[list.id][date] || [];
-  const n = list.items.filter(i => done.includes(i.id)).length;
-  el.innerHTML = `
-    <div class="spread" style="margin-bottom:10px"><h2 style="margin:0">${esc(list.name)}</h2><span class="sub">${n} / ${list.items.length}</span></div>
-    <div class="progress" style="margin-bottom:12px"><i style="width:${list.items.length ? n / list.items.length * 100 : 0}%"></i></div>
-    <div class="check-list">${list.items.map(i => `
-      <button class="check ${done.includes(i.id) ? 'done' : ''}" data-item="${i.id}">
-        <span class="box">${done.includes(i.id) ? '✓' : ''}</span><span class="label">${esc(i.name)}</span>
-      </button>`).join('')}</div>`;
-  el.querySelector('.check-list').onclick = async ev => {
-    const b = ev.target.closest('.check'); if (!b) return;
-    const cur = state.checks[list.id][date] || [];
-    const next = cur.includes(b.dataset.item) ? cur.filter(x => x !== b.dataset.item) : [...cur, b.dataset.item];
-    state.checks[list.id][date] = next;
-    drawCheckCard(el, list, date);
-    try { await api('setCheck', { date, listId: list.id, done: next }); }
-    catch (e) { state.checks[list.id][date] = cur; drawCheckCard(el, list, date); toast('沒存到，請再按一次'); }
   };
 }
 
@@ -809,109 +780,180 @@ async function renderPeriod() {
   };
 }
 
-// ───────── 清單 ─────────
-async function renderHabits() {
+// ───────── 清單（每一項有自己的頻率）─────────
+const WD_MON = [1, 2, 3, 4, 5, 6, 0];   // 星期一開頭
+const weekStartOf = s => addDays(s, -((parse(s).getDay() + 6) % 7));
+const doneOn = (h, d) => !!(state.habitChecks[h.id] && state.habitChecks[h.id].has(d));
+const isDueOn = (h, d) => h.freq !== 'weekdays' || h.days.includes(parse(d).getDay());
+const weekCount = (h, d) => { const ws = weekStartOf(d); let n = 0; for (let i = 0; i < 7; i++) if (doneOn(h, addDays(ws, i))) n++; return n; };
+const freqLabel = h => h.freq === 'weekdays' ? '每週' + WD_MON.filter(x => h.days.includes(x)).map(x => WD[x]).join('、')
+  : h.freq === 'weekly' ? `每週 ${h.times} 次` : '每天';
+const habitsOn = d => (state.habits || []).filter(h => h.active && h.start <= d && isDueOn(h, d));
+
+async function toggleHabit(h, d, redraw) {
+  const set = state.habitChecks[h.id] = state.habitChecks[h.id] || new Set();
+  const done = !set.has(d);
+  done ? set.add(d) : set.delete(d);
+  redraw();
+  try { await api('setHabitCheck', { date: d, habitId: h.id, done }); }
+  catch (e) { done ? set.delete(d) : set.add(d); redraw(); toast('沒存到，請再按一次'); }
+}
+
+function habitStats(h) {
   const t = today();
-  const current = state.lists.filter(l => l.end >= t).sort((a, b) => a.start.localeCompare(b.start));
-  const past = state.lists.filter(l => l.end < t).sort((a, b) => b.end.localeCompare(a.end));
-  $('#view').innerHTML = `
-    <div class="page-head"><div><h1>清單</h1><div class="sub">設定一段期間要做的事，每天打勾</div></div>
-      <button class="btn primary small" id="newList">＋ 新清單</button></div>
-    <div id="curLists">${current.length ? '' : '<div class="card empty">還沒有進行中的清單<br>按右上角「＋ 新清單」開始</div>'}</div>
-    ${past.length ? '<h2 style="margin-top:28px">已結束</h2><div id="pastLists"></div>' : ''}`;
-  $('#newList').onclick = () => openListEditor();
-  const draw = async (l, parent) => {
-    const el = document.createElement('section'); el.className = 'card'; parent.appendChild(el);
-    el.innerHTML = '<div class="loading-page" style="padding:10px"><span class="spin"></span></div>';
-    try { await loadChecks(l.id); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-    drawHabitCard(el, l);
+  if (h.start > t) return `<span>${fmtDate(h.start)} 開始</span>`;
+  const done = d => doneOn(h, d);
+  if (h.freq === 'weekly') {
+    const firstWeek = weekStartOf(h.start);
+    let streak = weekCount(h, t) >= h.times ? 1 : 0;
+    for (let w = addDays(weekStartOf(t), -7); w >= firstWeek && weekCount(h, w) >= h.times; w = addDays(w, -7)) streak++;
+    const total = [...(state.habitChecks[h.id] || [])].filter(d => d >= h.start && d <= t).length;
+    return `<span>本週 <b>${weekCount(h, t)}/${h.times}</b></span><span>連續達標 <b>${streak}</b> 週</span><span>累計 <b>${total}</b> 次</span>`;
+  }
+  const due = [];
+  for (let d = h.start; d <= t; d = addDays(d, 1)) if (isDueOn(h, d)) due.push(d);
+  const count = due.filter(done).length;
+  let streak = 0, i = due.length - 1;
+  if (i >= 0 && due[i] === t && !done(t)) i--;   // 今天還沒做不算斷
+  while (i >= 0 && done(due[i])) { streak++; i--; }
+  const rate = due.length ? Math.round(count / due.length * 100) : 0;
+  return `<span>完成率 <b>${rate}%</b></span><span>連續 <b>${streak}</b> ${h.freq === 'daily' ? '天' : '次'}</span><span>累計 <b>${count}</b> ${h.freq === 'daily' ? '天' : '次'}</span>`;
+}
+
+function habitGrid(h) {
+  const t = today();
+  const from = addDays(weekStartOf(t), -28);
+  let cells = WD_MON.map(x => `<span class="wd">${WD[x]}</span>`).join('');
+  for (let i = 0; i < 35; i++) {
+    const d = addDays(from, i);
+    const cls = d > t ? 'future' : d < h.start ? 'na' : doneOn(h, d) ? 'on' : isDueOn(h, d) ? '' : 'off';
+    const tappable = d <= t && d >= h.start;
+    cells += `<i class="${cls} ${d === t ? 'today' : ''}" ${tappable ? `data-d="${d}"` : ''} title="${d}"></i>`;
+  }
+  return `<div class="hgrid">${cells}</div>`;
+}
+
+// 今天頁：這天要做的
+function renderTodayChecks() {
+  const box = $('#todayChecks');
+  if (!state.habits) { box.innerHTML = ''; return; }
+  const date = state.date;
+  const list = habitsOn(date);
+  if (!list.length) {
+    box.innerHTML = state.habits.some(h => h.active) ? '' : `<section class="card spread"><span class="sub">還沒有要追蹤的事</span><button class="btn small" id="goHabits">新增</button></section>`;
+    if ($('#goHabits')) $('#goHabits').onclick = () => document.querySelector('[data-tab=habits]').click();
+    return;
+  }
+  const n = list.filter(h => doneOn(h, date)).length;
+  box.innerHTML = `<section class="card">
+    <div class="spread" style="margin-bottom:10px"><h2 style="margin:0">${date === today() ? '今天' : '這天'}要做的</h2><span class="sub">${n} / ${list.length}</span></div>
+    <div class="progress" style="margin-bottom:12px"><i style="width:${n / list.length * 100}%"></i></div>
+    <div class="check-list">${list.map(h => `
+      <button class="check ${doneOn(h, date) ? 'done' : ''}" data-id="${h.id}">
+        <span class="box">${doneOn(h, date) ? '✓' : ''}</span>
+        <span class="label">${esc(h.name)}</span>
+        <span class="sub" style="margin-left:auto">${h.freq === 'weekly' ? `本週 ${weekCount(h, date)}/${h.times}` : h.freq === 'weekdays' ? freqLabel(h) : ''}</span>
+      </button>`).join('')}</div>
+  </section>`;
+  box.querySelector('.check-list').onclick = ev => {
+    const b = ev.target.closest('.check'); if (!b) return;
+    toggleHabit(state.habits.find(h => h.id === b.dataset.id), date, renderTodayChecks);
   };
-  for (const l of current) draw(l, $('#curLists'));
-  for (const l of past) draw(l, $('#pastLists'));
 }
 
-function drawHabitCard(el, l) {
-  const t = today();
-  const checks = state.checks[l.id] || {};
-  const total = daysBetween(l.start, l.end) + 1;
-  const lastDay = t < l.end ? t : l.end;
-  const elapsed = t < l.start ? 0 : daysBetween(l.start, lastDay) + 1;
-  const status = t < l.start ? `${prettyDate(l.start)} 開始` : t > l.end ? '已結束' : `第 ${elapsed} 天，共 ${total} 天`;
-  const allDays = Array.from({ length: total }, (_, i) => addDays(l.start, i));
-
-  const habits = l.items.map(item => {
-    const doneOn = d => (checks[d] || []).includes(item.id);
-    const count = allDays.filter(d => d <= lastDay && doneOn(d)).length;
-    let streak = 0, d = lastDay;
-    if (!doneOn(d) && d === t) d = addDays(d, -1);
-    while (d >= l.start && doneOn(d)) { streak++; d = addDays(d, -1); }
-    const rate = elapsed ? Math.round(count / elapsed * 100) : 0;
-    return `<div class="habit">
-      <div class="spread"><b>${esc(item.name)}</b></div>
-      <div class="habit-stats"><span>完成 <b>${count}</b> 天</span><span>完成率 <b>${rate}%</b></span><span>連續 <b>${streak}</b> 天</span></div>
-      <div class="dots">${allDays.map(d => `<i class="${d > t ? 'future' : doneOn(d) ? 'on' : ''} ${d === t ? 'today' : ''}" title="${d}"></i>`).join('')}</div>
-    </div>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="spread"><h2 style="margin:0">${esc(l.name)}</h2><button class="btn small ghost" data-edit>編輯</button></div>
-    <p class="sub" style="margin:2px 0 6px">${l.start.replace(/-/g, '/')} – ${l.end.replace(/-/g, '/')}・${status}</p>
-    ${habits}`;
-  el.querySelector('[data-edit]').onclick = () => openListEditor(l);
+// 清單分頁
+function renderHabits() {
+  const v = $('#view');
+  if (!state.habits) {
+    v.innerHTML = '<div class="page-head"><h1>清單</h1></div><div class="card empty">後端還沒更新，請先部署新版本</div>';
+    return;
+  }
+  const active = state.habits.filter(h => h.active);
+  const archived = state.habits.filter(h => !h.active);
+  v.innerHTML = `
+    <div class="page-head"><div><h1>清單</h1><div class="sub">每一項都可以設定自己的頻率</div></div>
+      <button class="btn primary small" id="newHabit">＋ 新增</button></div>
+    ${active.length ? active.map(h => `
+      <section class="card habit-card" data-id="${h.id}">
+        <div class="spread"><div><b class="habit-name">${esc(h.name)}</b><div class="sub">${freqLabel(h)}</div></div>
+          <button class="btn small ghost" data-edit>編輯</button></div>
+        <div class="habit-stats">${habitStats(h)}</div>
+        ${habitGrid(h)}
+      </section>`).join('') : '<div class="card empty">還沒有要追蹤的事<br>按右上角「＋ 新增」開始</div>'}
+    ${active.length ? '<p class="sub" style="text-align:center;margin:-4px 0 16px">點格子可以補打卡或取消</p>' : ''}
+    ${archived.length ? `<details class="card"><summary>已封存（${archived.length}）</summary>${archived.map(h => `
+      <div class="spread habit-card" data-id="${h.id}" style="padding:10px 0;border-top:1px solid var(--line)">
+        <div><b>${esc(h.name)}</b><div class="sub">${freqLabel(h)}</div></div><button class="btn small ghost" data-edit>編輯</button></div>`).join('')}</details>` : ''}`;
+  $('#newHabit').onclick = () => openHabitEditor();
+  v.onclick = ev => {
+    const card = ev.target.closest('.habit-card'); if (!card) return;
+    const h = state.habits.find(x => x.id === card.dataset.id);
+    if (ev.target.closest('[data-edit]')) return openHabitEditor(h);
+    const cell = ev.target.closest('.hgrid i[data-d]');
+    if (cell) toggleHabit(h, cell.dataset.d, renderHabits);
+  };
 }
 
-function openListEditor(list) {
-  const isNew = !list;
-  const t = today();
-  const l = list ? JSON.parse(JSON.stringify(list)) : { name: '', start: t, end: addDays(t, 29), items: [] };
+function openHabitEditor(habit) {
+  const isNew = !habit;
+  const h = habit ? { ...habit, days: [...habit.days] } : { name: '', freq: 'daily', days: [1], times: 3, start: today(), active: true };
   const bg = document.createElement('div'); bg.className = 'sheet-bg';
-  bg.innerHTML = `<div class="sheet stack">
-    <div class="spread"><h2 style="margin:0">${isNew ? '新清單' : '編輯清單'}</h2><button class="icon-btn" data-close aria-label="關閉">✕</button></div>
-    <div><label class="field">名稱</label><input type="text" id="lName" value="${esc(l.name)}" placeholder="例如：十一月好習慣"></div>
-    <div class="row">
-      <div style="flex:1"><label class="field">開始</label><input type="date" id="lStart" value="${l.start}"></div>
-      <div style="flex:1"><label class="field">結束</label><input type="date" id="lEnd" value="${l.end}"></div>
-    </div>
-    <div><label class="field">要做的事</label><div id="lItems"></div>
-      <button class="btn small ghost" id="addItem">＋ 加一項</button></div>
-    <div class="row" style="padding-top:8px">
-      ${isNew ? '' : '<button class="btn danger" id="delList">刪除</button>'}
-      <button class="btn primary" id="saveList" style="flex:1">儲存</button>
-    </div>
-  </div>`;
   document.body.appendChild(bg);
-  const close = () => bg.remove();
-  bg.onclick = e => { if (e.target === bg || e.target.closest('[data-close]')) close(); };
-  const items = bg.querySelector('#lItems');
-  const addRow = (it = { id: '', name: '' }) => {
-    const row = document.createElement('div'); row.className = 'item-row'; row.dataset.id = it.id;
-    row.innerHTML = `<input type="text" value="${esc(it.name)}" placeholder="例如：早上喝一杯水"><button class="icon-btn" aria-label="移除">✕</button>`;
-    row.querySelector('button').onclick = () => row.remove();
-    items.appendChild(row);
-    return row;
-  };
-  (l.items.length ? l.items : [{}, {}, {}]).forEach(addRow);
-  bg.querySelector('#addItem').onclick = () => addRow().querySelector('input').focus();
-  bg.querySelector('#saveList').onclick = e => busy(e.currentTarget, async () => {
-    const out = {
-      id: l.id, name: bg.querySelector('#lName').value.trim(),
-      start: bg.querySelector('#lStart').value, end: bg.querySelector('#lEnd').value,
-      items: [...items.children].map(r => ({ id: r.dataset.id || Math.random().toString(36).slice(2, 10), name: r.querySelector('input').value.trim() })).filter(i => i.name),
+  const draw = () => {
+    bg.innerHTML = `<div class="sheet stack">
+      <div class="spread"><h2 style="margin:0">${isNew ? '新增' : '編輯'}</h2><button class="icon-btn" data-close aria-label="關閉">✕</button></div>
+      <div><label class="field">要做的事</label><input type="text" id="hName" value="${esc(h.name)}" placeholder="例如：運動 30 分鐘"></div>
+      <div><label class="field">頻率</label>
+        <div class="seg" id="hFreq" style="margin:0">
+          <button data-f="daily" class="${h.freq === 'daily' ? 'on' : ''}">每天</button>
+          <button data-f="weekdays" class="${h.freq === 'weekdays' ? 'on' : ''}">固定星期</button>
+          <button data-f="weekly" class="${h.freq === 'weekly' ? 'on' : ''}">每週幾次</button>
+        </div></div>
+      ${h.freq === 'weekdays' ? `<div><label class="field">每週的哪幾天</label><div class="chips" id="hDays">${WD_MON.map(x => `
+        <button class="chip ${h.days.includes(x) ? 'on' : ''}" data-x="${x}">${WD[x]}</button>`).join('')}</div></div>` : ''}
+      ${h.freq === 'weekly' ? `<div><label class="field">每週幾次（哪天做都可以）</label>
+        <div class="row"><button class="btn ghost" id="tMinus">−</button><b style="min-width:3em;text-align:center">${h.times} 次</b><button class="btn ghost" id="tPlus">＋</button></div></div>` : ''}
+      <div><label class="field">從哪天開始</label><input type="date" id="hStart" value="${h.start}"></div>
+      <div class="row" style="padding-top:8px">
+        ${isNew ? '' : `<button class="btn ghost" id="hArchive">${h.active ? '封存' : '恢復'}</button><button class="btn danger" id="hDelete">刪除</button>`}
+        <button class="btn primary" id="hSave" style="flex:1">儲存</button>
+      </div>
+    </div>`;
+    const keep = () => { h.name = bg.querySelector('#hName').value; h.start = bg.querySelector('#hStart').value; };
+    bg.querySelector('#hFreq').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { keep(); h.freq = b.dataset.f; draw(); } };
+    if (bg.querySelector('#hDays')) bg.querySelector('#hDays').onclick = e => {
+      const b = e.target.closest('[data-x]'); if (!b) return;
+      keep(); const x = Number(b.dataset.x);
+      h.days = h.days.includes(x) ? h.days.filter(y => y !== x) : [...h.days, x]; draw();
     };
-    if (!out.name) return toast('請取個名稱');
-    if (!out.start || !out.end || out.end < out.start) return toast('結束日要在開始日之後');
-    if (!out.items.length) return toast('至少要有一項');
-    state.lists = await api('saveList', { list: out });
-    toast('已儲存 ✓'); close(); render();
-  });
-  if (!isNew) bg.querySelector('#delList').onclick = e => {
-    if (!confirm(`確定要刪除「${l.name}」嗎？打卡紀錄會留在試算表，但 App 裡就看不到了。`)) return;
-    busy(e.currentTarget, async () => {
-      await api('deleteList', { id: l.id });
-      state.lists = state.lists.filter(x => x.id !== l.id);
-      toast('已刪除'); close(); render();
+    if (bg.querySelector('#tMinus')) {
+      bg.querySelector('#tMinus').onclick = () => { keep(); h.times = Math.max(1, h.times - 1); draw(); };
+      bg.querySelector('#tPlus').onclick = () => { keep(); h.times = Math.min(7, h.times + 1); draw(); };
+    }
+    const save = (btn, patch) => busy(btn, async () => {
+      keep();
+      const out = { ...h, ...patch, name: h.name.trim() };
+      if (!out.name) return toast('請輸入要做的事');
+      if (out.freq === 'weekdays' && !out.days.length) return toast('請至少選一天');
+      if (!out.start) return toast('請選開始日');
+      state.habits = await api('saveHabit', { habit: out });
+      toast('已儲存 ✓'); bg.remove(); render();
     });
+    bg.querySelector('#hSave').onclick = e => save(e.currentTarget, {});
+    if (!isNew) {
+      bg.querySelector('#hArchive').onclick = e => save(e.currentTarget, { active: !h.active });
+      bg.querySelector('#hDelete').onclick = e => {
+        if (!confirm(`確定要刪除「${h.name}」嗎？它的打卡紀錄也會一起刪除。只是暫時不做的話，可以用「封存」。`)) return;
+        busy(e.currentTarget, async () => {
+          state.habits = await api('deleteHabit', { id: h.id });
+          delete state.habitChecks[h.id];
+          toast('已刪除'); bg.remove(); render();
+        });
+      };
+    }
   };
+  bg.onclick = e => { if (e.target === bg || e.target.closest('[data-close]')) bg.remove(); };
+  draw();
 }
 
 // ───────── 設定 ─────────
@@ -952,28 +994,31 @@ function renderSettings() {
   const palette = ['#C8794F', '#6F8FAF', '#D4A23C', '#6E9A78', '#A0729B', '#C25E6E', '#5E9C9C', '#8C7B5E'];
   const draw = () => {
     rows.innerHTML = cats.map((c, i) => `
-      <div class="cat-row ${c.active ? '' : 'off'}" data-i="${i}">
-        <input type="color" value="${c.color}" data-k="color" aria-label="顏色">
-        <input type="text" value="${esc(c.name)}" data-k="name">
-        <button class="icon-btn" data-a="up" aria-label="往上" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button class="icon-btn" data-a="toggle" style="font-size:13px;min-width:48px">${c.active ? '隱藏' : '顯示'}</button>
+      <div class="cat-item ${c.active ? '' : 'off'}" data-i="${i}">
+        <div class="cat-row">
+          <input type="color" value="${c.color}" data-k="color" aria-label="顏色">
+          <input type="text" value="${esc(c.name)}" data-k="name" placeholder="分類名稱">
+          <button class="icon-btn" data-a="up" aria-label="往上" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="icon-btn" data-a="toggle" style="font-size:13px;min-width:48px">${c.active ? '隱藏' : '顯示'}</button>
+        </div>
+        <textarea data-k="desc" rows="2" placeholder="描述：這個分類要寫什麼？（選填）">${esc(c.desc || '')}</textarea>
       </div>`).join('');
   };
   draw();
-  rows.oninput = e => { const i = e.target.closest('.cat-row').dataset.i; cats[i][e.target.dataset.k] = e.target.value; };
+  rows.oninput = e => { const i = e.target.closest('.cat-item').dataset.i; cats[i][e.target.dataset.k] = e.target.value; };
   rows.onclick = e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
-    const i = Number(b.closest('.cat-row').dataset.i);
+    const i = Number(b.closest('.cat-item').dataset.i);
     if (b.dataset.a === 'up' && i > 0) [cats[i - 1], cats[i]] = [cats[i], cats[i - 1]];
     if (b.dataset.a === 'toggle') cats[i].active = !cats[i].active;
     draw();
   };
   $('#addCat').onclick = () => {
-    cats.push({ id: '', name: '', color: palette[cats.length % palette.length], active: true });
+    cats.push({ id: '', name: '', color: palette[cats.length % palette.length], active: true, desc: '' });
     draw(); rows.lastElementChild.querySelector('input[type=text]').focus();
   };
   $('#saveCats').onclick = () => busy($('#saveCats'), async () => {
-    const clean = cats.filter(c => c.name.trim()).map(c => ({ ...c, name: c.name.trim() }));
+    const clean = cats.filter(c => c.name.trim()).map(c => ({ ...c, name: c.name.trim(), desc: (c.desc || '').trim() }));
     if (!clean.some(c => c.active)) return toast('至少要留一個顯示中的分類');
     state.categories = await api('saveCategories', { categories: clean });
     toast('分類已儲存 ✓'); renderSettings();

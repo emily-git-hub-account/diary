@@ -14,22 +14,26 @@ const SHEETS = {
   CHECKS: '打卡',
   SUMMARIES: '每日總結',
   PERIODS: '期間回顧',
+  HABITS: '習慣',
+  HABIT_CHECKS: '習慣打卡',
 };
 
 const HEADERS = {
   [SHEETS.ENTRIES]: ['id', '日期', '分類ID', '分類名稱', '整理後內容', '原始文字', '建立時間', '更新時間'],
-  [SHEETS.CATEGORIES]: ['id', '名稱', '顏色', '排序', '啟用'],
+  [SHEETS.CATEGORIES]: ['id', '名稱', '顏色', '排序', '啟用', '描述'],
   [SHEETS.LISTS]: ['id', '名稱', '開始日', '結束日', '項目'],
   [SHEETS.CHECKS]: ['日期', '清單ID', '已完成項目', '更新時間'],
   [SHEETS.SUMMARIES]: ['日期', '內容', '建立時間'],
   [SHEETS.PERIODS]: ['起日', '迄日', '內容', '統計', '建立時間'],
+  [SHEETS.HABITS]: ['id', '名稱', '頻率', '設定', '開始日', '狀態', '排序'],
+  [SHEETS.HABIT_CHECKS]: ['日期', '習慣ID'],
 };
 
 const DEFAULT_CATEGORIES = [
-  ['感恩', '#C8794F'],
-  ['覺察', '#6F8FAF'],
-  ['發現幸福', '#D4A23C'],
-  ['習慣', '#6E9A78'],
+  ['感恩', '#C8794F', '今天讓你覺得開心、想說謝謝的人事物有哪些？'],
+  ['覺察', '#6F8FAF', '今天注意到自己的哪些情緒、想法或反應？背後可能是什麼？'],
+  ['發現幸福', '#D4A23C', '今天有哪些讓你覺得「好幸福」的小時刻？'],
+  ['習慣', '#6E9A78', '今天在想培養的習慣上做得怎麼樣？有什麼發現？'],
 ];
 
 // ───────────────────────── 試算表選單 ─────────────────────────
@@ -59,7 +63,7 @@ function setup() {
   });
   const cat = ss.getSheetByName(SHEETS.CATEGORIES);
   if (cat.getLastRow() === 1) {
-    DEFAULT_CATEGORIES.forEach((c, i) => cat.appendRow([newId_(), c[0], c[1], String(i + 1), 'TRUE']));
+    DEFAULT_CATEGORIES.forEach((c, i) => cat.appendRow([newId_(), c[0], c[1], String(i + 1), 'TRUE', c[2]]));
   }
   const first = ss.getSheetByName('工作表1') || ss.getSheetByName('Sheet1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
@@ -121,10 +125,14 @@ function doPost(e) {
 
 const ACTIONS = {
   login: () => true,
-  init: () => ({
-    categories: readCategories_(), lists: readLists_(), prompt: promptInfo_(),
-    entryDates: [...new Set(readEntries_().map(e => e.date))].sort(),
-  }),
+  init: () => {
+    upgrade_();
+    return {
+      categories: readCategories_(), prompt: promptInfo_(),
+      habits: readHabits_(), habitChecks: readHabitChecks_(),
+      entryDates: [...new Set(readEntries_().map(e => e.date))].sort(),
+    };
+  },
   savePrompt: b => savePrompt_(b.kind, b.prompt),
   summarizeDay: b => summarizeDay_(b.date),
   getSummaries: b => readSummaries_().filter(r => r.date >= b.from && r.date <= b.to),
@@ -134,12 +142,11 @@ const ACTIONS = {
   getEntriesByCategory: b => readEntries_().filter(r => r.categoryId === b.categoryId),
   saveEntry: b => withLock_(() => saveEntry_(b.entry)),
   deleteEntry: b => withLock_(() => deleteRowById_(SHEETS.ENTRIES, b.id)),
-  polish: b => polish_(b.text, b.categoryName),
+  polish: b => polish_(b.text, b.categoryName, b.categoryDesc),
   saveCategories: b => withLock_(() => saveCategories_(b.categories)),
-  saveList: b => withLock_(() => saveList_(b.list)),
-  deleteList: b => withLock_(() => deleteRowById_(SHEETS.LISTS, b.id)),
-  getChecks: b => readChecks_(b.listId),
-  setCheck: b => withLock_(() => setCheck_(b.date, b.listId, b.done)),
+  saveHabit: b => withLock_(() => saveHabit_(b.habit)),
+  deleteHabit: b => withLock_(() => deleteHabit_(b.id)),
+  setHabitCheck: b => withLock_(() => setHabitCheck_(b.date, b.habitId, b.done)),
 };
 
 function checkAuth_(password) {
@@ -194,59 +201,180 @@ function saveEntry_(entry) {
 
 function readCategories_() {
   return readRows_(SHEETS.CATEGORIES)
-    .map(r => ({ id: r[0], name: r[1], color: r[2], order: Number(r[3]) || 0, active: r[4] !== 'FALSE' }))
+    .map(r => ({ id: r[0], name: r[1], color: r[2], order: Number(r[3]) || 0, active: r[4] !== 'FALSE', desc: r[5] }))
     .sort((a, b) => a.order - b.order);
 }
 
 function saveCategories_(categories) {
   const sh = sheet_(SHEETS.CATEGORIES);
-  const rows = categories.map((c, i) => [c.id || newId_(), c.name, c.color, String(i + 1), c.active === false ? 'FALSE' : 'TRUE']);
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 5).clearContent();
-  if (rows.length) sh.getRange(2, 1, rows.length, 5).setValues(rows);
+  const rows = categories.map((c, i) => [c.id || newId_(), c.name, c.color, String(i + 1),
+    c.active === false ? 'FALSE' : 'TRUE', String(c.desc || '').trim()]);
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 6).clearContent();
+  if (rows.length) sh.getRange(2, 1, rows.length, 6).setNumberFormat('@').setValues(rows);
   return readCategories_();
 }
 
-// ───────────────────────── 清單與打卡 ─────────────────────────
+// ───────────────────────── 習慣（每一項有自己的頻率）─────────────────────────
+// 頻率：daily 每天／weekdays 每週固定星期（設定 = "1,3"，0 是星期日）／weekly 每週幾次（設定 = 次數）
 
-function readLists_() {
-  return readRows_(SHEETS.LISTS).map(r => ({
-    id: r[0], name: r[1], start: r[2], end: r[3], items: safeJson_(r[4], []),
-  }));
+const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+
+function readHabits_() {
+  return readRows_(SHEETS.HABITS).map(r => ({
+    id: r[0], name: r[1], freq: r[2] || 'daily',
+    days: r[2] === 'weekdays' ? String(r[3]).split(',').filter(x => x !== '').map(Number) : [],
+    times: r[2] === 'weekly' ? Number(r[3]) || 1 : 0,
+    start: r[4], active: r[5] !== 'archived', order: Number(r[6]) || 0,
+  })).sort((a, b) => a.order - b.order);
 }
 
-function saveList_(list) {
-  if (!list.name || !list.start || !list.end || !list.items || !list.items.length) {
-    throw new Error('名稱、期間、至少一個項目都要有');
-  }
-  const sh = sheet_(SHEETS.LISTS);
-  const id = list.id || newId_();
-  const values = [[id, list.name, list.start, list.end, JSON.stringify(list.items)]];
-  const row = list.id && findRow_(sh, list.id);
-  if (row) sh.getRange(row, 1, 1, 5).setValues(values);
-  else sh.appendRow(values[0]);
-  return readLists_();
+function saveHabit_(h) {
+  const name = String(h.name || '').trim();
+  if (!name) throw new Error('請輸入名稱');
+  if (['daily', 'weekdays', 'weekly'].indexOf(h.freq) < 0) throw new Error('請選擇頻率');
+  if (h.freq === 'weekdays' && !(h.days || []).length) throw new Error('請至少選一個星期幾');
+  if (!h.start) throw new Error('請選擇開始日');
+  const setting = h.freq === 'weekdays' ? h.days.join(',') : h.freq === 'weekly' ? String(Math.min(7, Math.max(1, Number(h.times) || 1))) : '';
+  const sh = sheet_(SHEETS.HABITS);
+  const row = h.id && findRow_(sh, h.id);
+  const order = row ? sh.getRange(row, 7).getDisplayValue() : String(sh.getLastRow());
+  const values = [h.id || newId_(), name, h.freq, setting, h.start, h.active === false ? 'archived' : 'active', order];
+  if (row) sh.getRange(row, 1, 1, 7).setValues([values]);
+  else sh.appendRow(values);
+  return readHabits_();
 }
 
-function readChecks_(listId) {
+function deleteHabit_(id) {
+  deleteRowById_(SHEETS.HABITS, id);
+  const sh = sheet_(SHEETS.HABIT_CHECKS);
+  const data = sh.getDataRange().getDisplayValues();
+  for (let i = data.length - 1; i >= 1; i--) if (data[i][1] === id) sh.deleteRow(i + 1);
+  return readHabits_();
+}
+
+function readHabitChecks_() {
   const out = {};
-  readRows_(SHEETS.CHECKS).forEach(r => {
-    if (r[1] === listId) out[r[0]] = safeJson_(r[2], []);
-  });
+  readRows_(SHEETS.HABIT_CHECKS).forEach(r => (out[r[1]] = out[r[1]] || []).push(r[0]));
   return out;
 }
 
-function setCheck_(date, listId, done) {
-  const sh = sheet_(SHEETS.CHECKS);
+function setHabitCheck_(date, habitId, done) {
+  const sh = sheet_(SHEETS.HABIT_CHECKS);
   const data = sh.getDataRange().getDisplayValues();
-  const values = [[date, listId, JSON.stringify(done || []), nowStr_()]];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === date && data[i][1] === listId) {
-      sh.getRange(i + 1, 1, 1, 4).setValues(values);
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0] === date && data[i][1] === habitId) {
+      if (!done) sh.deleteRow(i + 1);
       return true;
     }
   }
-  sh.appendRow(values[0]);
+  if (done) sh.appendRow([date, habitId]);
   return true;
+}
+
+function freqText_(h) {
+  if (h.freq === 'weekdays') return '每週' + h.days.map(d => WEEKDAY_NAMES[d]).join('、');
+  if (h.freq === 'weekly') return '每週 ' + h.times + ' 次';
+  return '每天';
+}
+
+// 日期小工具（字串 yyyy-MM-dd，用 UTC 算避免時區跑掉）
+function weekday_(d) { return new Date(d + 'T00:00:00Z').getUTCDay(); }
+function addDays_(d, n) { return new Date(new Date(d + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10); }
+function weekStart_(d) { return addDays_(d, -((weekday_(d) + 6) % 7)); }
+function todayStr_() { return Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd'); }
+
+// 給 AI 看的打卡文字
+function habitLinesForDay_(date) {
+  const checks = readHabitChecks_();
+  const lines = [];
+  let checked = 0;
+  readHabits_().forEach(h => {
+    const dates = checks[h.id] || [];
+    const doneToday = dates.indexOf(date) >= 0;
+    if (h.start > date || (!h.active && !doneToday)) return;
+    if (doneToday) checked++;
+    if (h.freq === 'weekly') {
+      const ws = weekStart_(date);
+      const n = dates.filter(d => d >= ws && d <= date).length;
+      lines.push((doneToday ? '✓' : '・') + h.name + '（每週 ' + h.times + ' 次，本週到今天完成 ' + n + ' 次）');
+    } else if (h.freq === 'daily' || h.days.indexOf(weekday_(date)) >= 0 || doneToday) {
+      lines.push((doneToday ? '✓' : '✗') + h.name + '（' + freqText_(h) + '）');
+    }
+  });
+  return { lines: lines, checked: checked };
+}
+
+function habitLinesForPeriod_(from, to) {
+  const checks = readHabitChecks_();
+  const end0 = [to, todayStr_()].sort()[0];
+  const lines = [];
+  readHabits_().forEach(h => {
+    const s = h.start > from ? h.start : from;
+    if (s > end0) return;
+    const done = (checks[h.id] || []).filter(d => d >= s && d <= end0).length;
+    if (!h.active && !done) return;
+    const days = [];
+    for (let d = s; d <= end0; d = addDays_(d, 1)) days.push(d);
+    if (h.freq === 'daily') lines.push(h.name + '（每天）：完成 ' + done + ' / ' + days.length + ' 天');
+    else if (h.freq === 'weekdays') {
+      const due = days.filter(d => h.days.indexOf(weekday_(d)) >= 0).length;
+      lines.push(h.name + '（' + freqText_(h) + '）：完成 ' + done + ' / ' + due + ' 次');
+    } else {
+      const weeks = new Set(days.map(weekStart_)).size;
+      lines.push(h.name + '（每週 ' + h.times + ' 次）：共完成 ' + done + ' 次，期間共 ' + weeks + ' 週');
+    }
+  });
+  return lines;
+}
+
+// ───────────────────────── 舊版資料升級 ─────────────────────────
+// 1. 舊的「清單＋項目」搬成一項一項的習慣（每天），打卡紀錄一起搬
+// 2. 分類補上「描述」欄，預設四個分類填入建議描述
+
+function upgrade_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('UPGRADED_V2')) return;
+  withLock_(() => {
+    if (props.getProperty('UPGRADED_V2')) return;
+    const ss = SpreadsheetApp.getActive();
+
+    const cat = sheet_(SHEETS.CATEGORIES);
+    cat.getRange(1, 6).setValue('描述').setFontWeight('bold').setBackground('#F3EDE4');
+    cat.getRange(1, 6, cat.getMaxRows(), 1).setNumberFormat('@');
+    if (cat.getLastRow() > 1) {
+      const rows = cat.getRange(2, 1, cat.getLastRow() - 1, 6).getDisplayValues();
+      rows.forEach((r, i) => {
+        const def = DEFAULT_CATEGORIES.find(c => c[0] === r[1]);
+        if (def && !r[5]) cat.getRange(i + 2, 6).setValue(def[2]);
+      });
+    }
+
+    const habits = sheet_(SHEETS.HABITS);
+    const habitChecks = sheet_(SHEETS.HABIT_CHECKS);
+    const listSheet = ss.getSheetByName(SHEETS.LISTS);
+    const checkSheet = ss.getSheetByName(SHEETS.CHECKS);
+    if (listSheet && listSheet.getLastRow() > 1 && habits.getLastRow() < 2) {
+      const today = todayStr_();
+      const oldChecks = checkSheet && checkSheet.getLastRow() > 1
+        ? checkSheet.getRange(2, 1, checkSheet.getLastRow() - 1, 3).getDisplayValues() : [];
+      const habitRows = [];
+      const checkRows = [];
+      listSheet.getRange(2, 1, listSheet.getLastRow() - 1, 5).getDisplayValues().forEach(r => {
+        if (!r[0]) return;
+        const [listId, , start, end] = r;
+        safeJson_(r[4], []).forEach(item => {
+          const id = newId_();
+          habitRows.push([id, item.name, 'daily', '', start, end < today ? 'archived' : 'active', String(habitRows.length + 1)]);
+          oldChecks.forEach(c => {
+            if (c[1] === listId && safeJson_(c[2], []).indexOf(item.id) >= 0) checkRows.push([c[0], id]);
+          });
+        });
+      });
+      if (habitRows.length) habits.getRange(2, 1, habitRows.length, 7).setValues(habitRows);
+      if (checkRows.length) habitChecks.getRange(2, 1, checkRows.length, 2).setValues(checkRows);
+    }
+    props.setProperty('UPGRADED_V2', '1');
+  });
 }
 
 // ───────────────────────── Claude 整理 ─────────────────────────
@@ -301,10 +429,11 @@ function promptInfo_() {
   };
 }
 
-function polish_(text, categoryName) {
+function polish_(text, categoryName, categoryDesc) {
   text = String(text || '').trim();
   if (!text) throw new Error('沒有內容可以整理');
-  const system = getPrompt_('polish') + '\n\n這篇日記的分類是「' + (categoryName || '日記') + '」。';
+  let system = getPrompt_('polish') + '\n\n這篇日記的分類是「' + (categoryName || '日記') + '」。';
+  if (categoryDesc) system += '這個分類要寫的是：' + categoryDesc;
   return callClaude_(system, text);
 }
 
@@ -321,17 +450,9 @@ function summarizeDay_(date) {
   if (entries.length) entries.forEach(e => lines.push('［' + e.categoryName + '］' + e.content, ''));
   else lines.push('（這天沒有寫日記）', '');
 
-  let checked = 0;
-  const lists = readLists_().filter(l => l.start <= date && date <= l.end);
-  if (lists.length) {
-    lines.push('【習慣打卡】');
-    lists.forEach(l => {
-      const done = readChecks_(l.id)[date] || [];
-      checked += done.length;
-      lines.push(l.name + '：' + l.items.map(i => (done.indexOf(i.id) >= 0 ? '✓' : '✗') + i.name).join('、'));
-    });
-  }
-  if (!entries.length && !checked) throw new Error('這天還沒有日記或打卡，先寫一點再來整理吧');
+  const habit = habitLinesForDay_(date);
+  if (habit.lines.length) lines.push('【習慣打卡】', ...habit.lines);
+  if (!entries.length && !habit.checked) throw new Error('這天還沒有日記或打卡，先寫一點再來整理吧');
 
   const content = callClaude_(getPrompt_('summary'), lines.join('\n'));
   return withLock_(() => {
@@ -370,23 +491,8 @@ function summarizePeriod_(from, to) {
   stats.categories.forEach(c => lines.push(c.name + '：' + c.count + ' 則'));
   lines.push('共 ' + stats.total + ' 則，有寫日記的天數：' + stats.days + ' 天', '');
 
-  const today = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
-  const lists = readLists_().filter(l => l.start <= to && l.end >= from);
-  if (lists.length) {
-    lines.push('【習慣打卡】');
-    lists.forEach(l => {
-      const start = l.start > from ? l.start : from;
-      const end = [l.end, to, today].sort()[0];
-      const checks = readChecks_(l.id);
-      const dates = Object.keys(checks).filter(d => d >= start && d <= end);
-      const span = Math.max(0, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
-      l.items.forEach(i => {
-        const n = dates.filter(d => checks[d].indexOf(i.id) >= 0).length;
-        lines.push(l.name + '・' + i.name + '：完成 ' + n + ' / ' + span + ' 天');
-      });
-    });
-    lines.push('');
-  }
+  const habitLines = habitLinesForPeriod_(from, to);
+  if (habitLines.length) lines.push('【習慣打卡】', ...habitLines, '');
 
   lines.push('【日記】');
   entries.forEach(e => lines.push(e.date + '［' + e.categoryName + '］' + e.content, ''));
@@ -457,7 +563,7 @@ function sheet_(name) {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(name);
   if (sh) return sh;
-  if ([SHEETS.SUMMARIES, SHEETS.PERIODS].indexOf(name) < 0) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
+  if ([SHEETS.SUMMARIES, SHEETS.PERIODS, SHEETS.HABITS, SHEETS.HABIT_CHECKS].indexOf(name) < 0) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
   // 後來才加的分頁，第一次用到時自動建立
   sh = ss.insertSheet(name);
   sh.appendRow(HEADERS[name]);
