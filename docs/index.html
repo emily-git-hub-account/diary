@@ -114,6 +114,16 @@ label.field { display: block; font-size: 14px; color: var(--muted); margin-botto
 .summary-h { display: block; font-family: var(--serif); color: var(--accent); margin-top: 14px; }
 .summary-h:first-child { margin-top: 6px; }
 .summary-card { background: color-mix(in srgb, var(--accent) 7%, var(--card)); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
+.streak { display: inline-block; margin-top: 8px; font-size: 14px; padding: 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); }
+.streak.pending { background: var(--soft); color: var(--muted); }
+.streak b { font-size: 16px; }
+.bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.bar-row { display: grid; grid-template-columns: 6.5em 1fr 2em; align-items: center; gap: 10px; }
+.bar-row b { text-align: right; }
+.bar { height: 10px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 99px; min-width: 2px; }
+.hist-row { width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; display: flex; justify-content: space-between; align-items: center; padding: 12px 0; min-height: 48px; text-align: left; }
+.hist-row:first-child { border-top: 0; }
 details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
 
 /* 打卡 */
@@ -250,6 +260,7 @@ async function api(action, payload = {}) {
   });
   const j = await res.json();
   if (!j.ok) {
+    if (/未知的動作/.test(j.error)) throw new Error('後端還沒更新，請先部署新版本');
     if (j.auth && action !== 'login') logout(j.error);
     throw new Error(j.error || '發生錯誤');
   }
@@ -290,7 +301,7 @@ async function loadSummaries(ym) {
   if (state.summaries[ym]) return state.summaries[ym];
   const map = {};
   try { (await api('getSummaries', { from: ym + '-01', to: ym + '-31' })).forEach(x => map[x.date] = x); }
-  catch (e) { if (!/未知的動作/.test(e.message)) throw e; }  // 後端還沒部署新版時當作沒有
+  catch (e) { if (!/部署新版本/.test(e.message)) throw e; }  // 後端還沒部署新版時當作沒有
   return (state.summaries[ym] = map);
 }
 async function loadChecks(listId, force) {
@@ -321,6 +332,7 @@ async function start() {
   try {
     const d = await api('init');
     state.categories = d.categories; state.lists = d.lists; state.prompt = d.prompt || null;
+    state.entryDates = d.entryDates ? new Set(d.entryDates) : null;
     render();
   } catch (e) {
     $('#view').innerHTML = `<div class="empty">載入失敗：${esc(e.message)}<br><br><button class="btn" onclick="start()">再試一次</button></div>`;
@@ -338,6 +350,18 @@ document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
 function render() { ({ today: renderToday, review: renderReview, habits: renderHabits, settings: renderSettings })[state.tab](); }
 
 // ───────── 今天 ─────────
+function streakHtml() {
+  if (!state.entryDates) return '';
+  const t = today();
+  const done = state.entryDates.has(t);
+  let n = 0, d = done ? t : addDays(t, -1);
+  while (state.entryDates.has(d)) { n++; d = addDays(d, -1); }
+  const text = !n ? '寫下第一則，開始累積連續天數 🌱'
+    : done ? `🔥 已經連續寫了 <b>${n}</b> 天`
+    : `🔥 連續 <b>${n}</b> 天・今天寫一則就能接上`;
+  return `<div class="streak ${n && !done ? 'pending' : ''}">${text}</div>`;
+}
+
 async function renderToday() {
   const v = $('#view');
   const d = state.draft;
@@ -350,6 +374,7 @@ async function renderToday() {
       <div>
         <div class="sub">${isToday ? '今天' : '補寫'}</div>
         <h1>${prettyDate(state.date)}</h1>
+        ${isToday ? streakHtml() : ''}
       </div>
       <label class="btn ghost small" style="position:relative">換日期
         <input type="date" id="pickDate" value="${state.date}" max="${today()}" style="position:absolute;inset:0;opacity:0;width:100%">
@@ -527,6 +552,7 @@ async function saveEntry(content, raw) {
   const cat = catById(d.categoryId);
   await api('saveEntry', { entry: { id: d.id, date: d.date, categoryId: d.categoryId, categoryName: cat.name, content, raw } });
   delete state.months[monthOf(d.date)];
+  if (state.entryDates) state.entryDates.add(d.date);
   state.byCat = {};
   toast(d.id ? '已更新 ✓' : '已儲存 ✓');
   resetDraft();
@@ -572,6 +598,9 @@ function bindEntryActions(box, list, refresh) {
       await busy(btn, async () => {
         await api('deleteEntry', { id: e.id });
         delete state.months[monthOf(e.date)]; state.byCat = {};
+        const left = await loadMonth(monthOf(e.date));
+        if (state.entryDates && !left.some(x => x.date === e.date)) state.entryDates.delete(e.date);
+        if ($('.streak')) $('.streak').outerHTML = streakHtml();
         toast('已刪除'); refresh();
       });
     }
@@ -622,10 +651,10 @@ async function renderReview() {
   const r = state.review;
   $('#view').innerHTML = `
     <div class="page-head"><h1>回顧</h1></div>
-    <div class="seg"><button data-mode="date" class="${r.mode === 'date' ? 'on' : ''}">依日期</button><button data-mode="cat" class="${r.mode === 'cat' ? 'on' : ''}">依分類</button></div>
+    <div class="seg"><button data-mode="date" class="${r.mode === 'date' ? 'on' : ''}">依日期</button><button data-mode="cat" class="${r.mode === 'cat' ? 'on' : ''}">依分類</button><button data-mode="ai" class="${r.mode === 'ai' ? 'on' : ''}">AI 回顧</button></div>
     <div id="reviewBody"></div>`;
   document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { r.mode = b.dataset.mode; renderReview(); });
-  r.mode === 'date' ? renderByDate() : renderByCat();
+  ({ date: renderByDate, cat: renderByCat, ai: renderPeriod })[r.mode]();
 }
 
 async function renderByDate() {
@@ -703,6 +732,81 @@ async function renderByCat() {
     ? `<p class="sub" style="margin:0 0 8px">共 ${list.length} 則</p><section class="card" style="padding-top:12px;padding-bottom:6px">${list.map(e => entryHtml(e, true)).join('')}</section>`
     : '<div class="empty">這個分類還沒有日記</div>';
   bindEntryActions(box, list, () => { delete state.byCat[cid]; renderByCat(); });
+}
+
+// AI 回顧一段時間
+const fmtDate = s => s.replace(/-/g, '/');
+function periodPresets() {
+  const t = today();
+  const first = t.slice(0, 8) + '01';
+  const lastMonthEnd = addDays(first, -1);
+  return [
+    { label: '最近 7 天', from: addDays(t, -6), to: t },
+    { label: '最近 30 天', from: addDays(t, -29), to: t },
+    { label: '這個月', from: first, to: t },
+    { label: '上個月', from: lastMonthEnd.slice(0, 8) + '01', to: lastMonthEnd },
+  ];
+}
+
+function periodHtml(p) {
+  const st = p.stats || { total: 0, days: 0, categories: [] };
+  const max = Math.max(1, ...st.categories.map(c => c.count));
+  return `<section class="card summary-card">
+    <h2 style="margin-bottom:4px">${fmtDate(p.from)} – ${fmtDate(p.to)}</h2>
+    <p class="sub" style="margin:0 0 12px">共 <b>${st.total}</b> 則・寫了 <b>${st.days}</b> 天</p>
+    <div class="bars">${st.categories.map(c => `
+      <div class="bar-row"><span class="tag" style="--c:${c.color}"><span class="dot"></span>${esc(c.name)}</span>
+        <span class="bar"><i style="width:${c.count / max * 100}%;background:${c.color}"></i></span><b>${c.count}</b></div>`).join('')}
+    </div>
+    <b class="summary-h">給你的話</b>
+    <div class="summary-body">${esc(p.content.trim())}</div>
+  </section>`;
+}
+
+async function renderPeriod() {
+  const r = state.review;
+  const presets = periodPresets();
+  if (!r.from) { r.from = presets[0].from; r.to = presets[0].to; }
+  $('#reviewBody').innerHTML = `
+    <section class="card stack">
+      <h2 style="margin:0">回顧一段時間</h2>
+      <div class="chips" id="presets">${presets.map((p, i) => `
+        <button class="chip ${p.from === r.from && p.to === r.to ? 'on' : ''}" data-i="${i}">${p.label}</button>`).join('')}</div>
+      <div class="row">
+        <div style="flex:1"><label class="field">從</label><input type="date" id="pFrom" value="${r.from}" max="${today()}"></div>
+        <div style="flex:1"><label class="field">到</label><input type="date" id="pTo" value="${r.to}" max="${today()}"></div>
+      </div>
+      <button class="btn primary block" id="periodBtn">✨ 幫我回顧這段時間</button>
+    </section>
+    <div id="periodResult">${r.result ? periodHtml(r.result) : ''}</div>
+    <div id="periodHistory"></div>`;
+  $('#presets').onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    const p = presets[b.dataset.i]; r.from = p.from; r.to = p.to; renderPeriod();
+  };
+  $('#pFrom').onchange = e => { r.from = e.target.value; };
+  $('#pTo').onchange = e => { r.to = e.target.value; };
+  $('#periodBtn').onclick = e => busy(e.currentTarget, async () => {
+    if (!r.from || !r.to || r.to < r.from) return toast('「到」要在「從」之後');
+    r.result = await api('summarizePeriod', { from: r.from, to: r.to });
+    if (state.periodHistory) state.periodHistory.unshift(r.result);
+    renderPeriod();
+  });
+
+  try { state.periodHistory = state.periodHistory || await api('getPeriodSummaries'); }
+  catch (err) { return; }
+  if (state.tab !== 'review' || r.mode !== 'ai') return;
+  const hist = state.periodHistory.filter(p => p !== r.result);
+  if (!hist.length) return;
+  $('#periodHistory').innerHTML = `<h2 style="margin-top:24px">過去的回顧</h2>
+    <section class="card" style="padding:6px 18px">${hist.map((p, i) => `
+      <button class="hist-row" data-i="${i}"><span>${fmtDate(p.from)} – ${fmtDate(p.to)}</span><span class="sub">${p.stats ? p.stats.total + ' 則' : ''} ›</span></button>`).join('')}
+    </section>`;
+  $('#periodHistory').onclick = e => {
+    const b = e.target.closest('.hist-row'); if (!b) return;
+    r.result = hist[b.dataset.i]; r.from = r.result.from; r.to = r.result.to;
+    renderPeriod(); $('#periodResult').scrollIntoView({ behavior: 'smooth' });
+  };
 }
 
 // ───────── 清單 ─────────
@@ -813,7 +917,8 @@ function openListEditor(list) {
 // ───────── 設定 ─────────
 const PROMPTS = [
   { kind: 'polish', key: 'prompt', title: 'AI 整理方式', desc: '按「幫我整理」時，Claude 會照這段話整理你的日記。分類名稱會自動附在最後，不用寫進來。' },
-  { kind: 'summary', key: 'summaryPrompt', title: '每日總結方式', desc: '按「幫我整理今天」時，Claude 會照這段話寫今天的總結和給你的話。當天的日記和打卡會自動附上。' },
+  { kind: 'summary', key: 'summaryPrompt', title: '每日總結方式', desc: '按「幫我整理今天」時，Claude 會照這段話寫給你的話。當天的日記和打卡會自動附上。' },
+  { kind: 'period', key: 'periodPrompt', title: '期間回顧方式', desc: '在「回顧 → AI 回顧」按下回顧時，Claude 會照這段話寫。那段時間的日記、各分類篇數和打卡統計會自動附上，篇數 App 會自己算好顯示。' },
 ];
 function renderSettings() {
   const cats = JSON.parse(JSON.stringify(state.categories));

@@ -13,6 +13,7 @@ const SHEETS = {
   LISTS: '清單',
   CHECKS: '打卡',
   SUMMARIES: '每日總結',
+  PERIODS: '期間回顧',
 };
 
 const HEADERS = {
@@ -21,6 +22,7 @@ const HEADERS = {
   [SHEETS.LISTS]: ['id', '名稱', '開始日', '結束日', '項目'],
   [SHEETS.CHECKS]: ['日期', '清單ID', '已完成項目', '更新時間'],
   [SHEETS.SUMMARIES]: ['日期', '內容', '建立時間'],
+  [SHEETS.PERIODS]: ['起日', '迄日', '內容', '統計', '建立時間'],
 };
 
 const DEFAULT_CATEGORIES = [
@@ -119,10 +121,15 @@ function doPost(e) {
 
 const ACTIONS = {
   login: () => true,
-  init: () => ({ categories: readCategories_(), lists: readLists_(), prompt: promptInfo_() }),
+  init: () => ({
+    categories: readCategories_(), lists: readLists_(), prompt: promptInfo_(),
+    entryDates: [...new Set(readEntries_().map(e => e.date))].sort(),
+  }),
   savePrompt: b => savePrompt_(b.kind, b.prompt),
   summarizeDay: b => summarizeDay_(b.date),
   getSummaries: b => readSummaries_().filter(r => r.date >= b.from && r.date <= b.to),
+  summarizePeriod: b => summarizePeriod_(b.from, b.to),
+  getPeriodSummaries: () => readPeriodSummaries_(),
   getEntries: b => readEntries_().filter(r => r.date >= b.from && r.date <= b.to),
   getEntriesByCategory: b => readEntries_().filter(r => r.categoryId === b.categoryId),
   saveEntry: b => withLock_(() => saveEntry_(b.entry)),
@@ -261,8 +268,15 @@ const DEFAULT_PROMPTS = {
     '像信任的朋友一樣真誠，不說教、不灌雞湯、不堆驚嘆號。',
     '不要假裝是納瓦爾本人，也不要直接引用他的名言。只輸出這段話本身，不要標題、不要前言。',
   ].join('\n'),
+  period: [
+    '你是一位睿智、溫和、話不多的人生導師，說話風格像納瓦爾（Naval Ravikant）：簡潔、直指本質，重視長期思維、內在平靜、自我覺察和複利。',
+    '使用者會給你他一段期間的日記、各分類篇數和習慣打卡統計。讀完之後，用繁體中文寫一段給他的話：',
+    '4 到 6 句。點出這段時間反覆出現的主題或明顯的變化，具體肯定他做到的事（只根據他寫的內容，不要編造），再給一個可以帶進下一段時間的提醒。',
+    '像信任的朋友一樣真誠，不說教、不灌雞湯、不堆驚嘆號。',
+    '不要假裝是納瓦爾本人，也不要直接引用他的名言。只輸出這段話本身，不要標題、不要前言，也不用重複列出篇數。',
+  ].join('\n'),
 };
-const PROMPT_KEYS = { polish: 'CUSTOM_PROMPT', summary: 'CUSTOM_SUMMARY_PROMPT' };
+const PROMPT_KEYS = { polish: 'CUSTOM_PROMPT', summary: 'CUSTOM_SUMMARY_PROMPT', period: 'CUSTOM_PERIOD_PROMPT' };
 
 // 使用者在 App 設定頁改過就用他的版本，沒改過用預設
 function getPrompt_(kind) {
@@ -283,6 +297,7 @@ function promptInfo_() {
   return {
     prompt: getPrompt_('polish'), defaultPrompt: DEFAULT_PROMPTS.polish,
     summaryPrompt: getPrompt_('summary'), defaultSummaryPrompt: DEFAULT_PROMPTS.summary,
+    periodPrompt: getPrompt_('period'), defaultPeriodPrompt: DEFAULT_PROMPTS.period,
   };
 }
 
@@ -334,6 +349,71 @@ function summarizeDay_(date) {
   });
 }
 
+// ───────────────────────── 期間回顧 ─────────────────────────
+
+function readPeriodSummaries_() {
+  return readRows_(SHEETS.PERIODS)
+    .map(r => ({ from: r[0], to: r[1], content: r[2], stats: safeJson_(r[3], null), createdAt: r[4] }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function summarizePeriod_(from, to) {
+  if (!from || !to || to < from) throw new Error('請選擇正確的期間');
+  if ((new Date(to) - new Date(from)) / 86400000 > 366) throw new Error('期間最長一年');
+  const entries = readEntries_()
+    .filter(e => e.date >= from && e.date <= to)
+    .sort((a, b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt));
+  if (!entries.length) throw new Error('這段期間沒有日記');
+
+  const stats = periodStats_(entries);
+  const lines = ['期間：' + from + ' 到 ' + to, '', '【各分類篇數】'];
+  stats.categories.forEach(c => lines.push(c.name + '：' + c.count + ' 則'));
+  lines.push('共 ' + stats.total + ' 則，有寫日記的天數：' + stats.days + ' 天', '');
+
+  const today = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const lists = readLists_().filter(l => l.start <= to && l.end >= from);
+  if (lists.length) {
+    lines.push('【習慣打卡】');
+    lists.forEach(l => {
+      const start = l.start > from ? l.start : from;
+      const end = [l.end, to, today].sort()[0];
+      const checks = readChecks_(l.id);
+      const dates = Object.keys(checks).filter(d => d >= start && d <= end);
+      const span = Math.max(0, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
+      l.items.forEach(i => {
+        const n = dates.filter(d => checks[d].indexOf(i.id) >= 0).length;
+        lines.push(l.name + '・' + i.name + '：完成 ' + n + ' / ' + span + ' 天');
+      });
+    });
+    lines.push('');
+  }
+
+  lines.push('【日記】');
+  entries.forEach(e => lines.push(e.date + '［' + e.categoryName + '］' + e.content, ''));
+
+  const content = callClaude_(getPrompt_('period'), lines.join('\n'));
+  const now = nowStr_();
+  withLock_(() => sheet_(SHEETS.PERIODS).appendRow([from, to, content, JSON.stringify(stats), now]));
+  return { from: from, to: to, content: content, stats: stats, createdAt: now };
+}
+
+// 篇數由程式算，不交給 AI，數字才會準
+function periodStats_(entries) {
+  const cats = readCategories_();
+  const counts = {};
+  entries.forEach(e => counts[e.categoryId] = (counts[e.categoryId] || 0) + 1);
+  const list = cats
+    .filter(c => c.active || counts[c.id])
+    .map(c => ({ name: c.name, color: c.color, count: counts[c.id] || 0 }));
+  Object.keys(counts).forEach(id => {
+    if (!cats.some(c => c.id === id)) {
+      const e = entries.find(x => x.categoryId === id);
+      list.push({ name: e.categoryName, color: '#999999', count: counts[id] });
+    }
+  });
+  return { total: entries.length, days: new Set(entries.map(e => e.date)).size, categories: list };
+}
+
 function callClaude_(system, text) {
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) throw new Error('還沒設定 Claude 金鑰，請到試算表選單「📔 日記設定 → ③ 設定 Claude 金鑰」。');
@@ -377,7 +457,7 @@ function sheet_(name) {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(name);
   if (sh) return sh;
-  if (name !== SHEETS.SUMMARIES) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
+  if ([SHEETS.SUMMARIES, SHEETS.PERIODS].indexOf(name) < 0) throw new Error('找不到「' + name + '」分頁，請先按選單「① 初始化」。');
   // 後來才加的分頁，第一次用到時自動建立
   sh = ss.insertSheet(name);
   sh.appendRow(HEADERS[name]);
