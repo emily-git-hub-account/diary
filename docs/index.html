@@ -7,74 +7,80 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="日記">
-<meta name="theme-color" content="#F7F2EA" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1C1A17" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F6F5F1" media="(prefers-color-scheme: light)" id="themeColor">
+<meta name="theme-color" content="#1B1D1C" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>日記</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script>try { var p = JSON.parse(localStorage.getItem('palette')); if (p) document.documentElement.dataset.palette = p; } catch (e) {}</script>
 <style>
+/* 版型固定，顏色可在設定換：sage 鼠尾草（預設）／rose 霧玫瑰／blue 霧藍／tea 奶茶 */
 :root {
-  --bg: #F7F2EA;
-  --card: #FFFDF9;
-  --ink: #2F2A25;
-  --muted: #8A8178;
-  --line: #E8DFD3;
-  --soft: #F0E9DF;
-  --accent: #B5683F;
+  --bg: #F6F5F1; --card: #FFFFFF; --ink: #2E3430; --muted: #8E948F; --line: #E7E5DF;
+  --accent: #6F8F7E; --soft: #EDF2EE; --accent-d: #9DBBA9;
   --accent-ink: #FFFFFF;
-  --danger: #B54A3F;
-  --shadow: 0 1px 2px rgba(60, 45, 30, .06), 0 4px 16px rgba(60, 45, 30, .05);
+  --danger: #B5574C;
+  --box: color-mix(in srgb, var(--ink) 20%, var(--card));
   --serif: "Noto Serif TC", "Songti TC", serif;
+  --latin: "Cormorant Garamond", "Noto Serif TC", serif;
   --sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   color-scheme: light;
 }
+:root[data-palette="rose"] { --bg: #F7F2F0; --ink: #3A2E33; --muted: #9D8F94; --line: #EEE4E1; --accent: #A6707E; --soft: #F4E8EA; --accent-d: #D3A1AE; }
+:root[data-palette="blue"] { --bg: #F4F6F7; --ink: #2C333B; --muted: #8B939B; --line: #E3E7EA; --accent: #6B84A0; --soft: #E9EEF4; --accent-d: #9DB3CC; }
+:root[data-palette="tea"]  { --bg: #F7F3EE; --ink: #3A322C; --muted: #9A8F85; --line: #EAE2D8; --accent: #A08268; --soft: #F1E9E0; --accent-d: #CDB096; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1C1A17; --card: #26231F; --ink: #EDE6DC; --muted: #A39A8F; --line: #3A352F;
-    --soft: #2F2B26; --accent: #E0905F; --accent-ink: #1C1A17; --danger: #E07A6F;
-    --shadow: none; color-scheme: dark;
+    --bg: #1B1D1C; --card: #242726; --ink: #E8E6E1; --muted: #9A9F9B; --line: #353937;
+    --accent: var(--accent-d); --soft: color-mix(in srgb, var(--accent-d) 16%, #242726);
+    --accent-ink: #1B1D1C; --danger: #E08A7F; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #1C1A17; --card: #26231F; --ink: #EDE6DC; --muted: #A39A8F; --line: #3A352F;
-  --soft: #2F2B26; --accent: #E0905F; --accent-ink: #1C1A17; --danger: #E07A6F;
-  --shadow: none; color-scheme: dark;
+  --bg: #1B1D1C; --card: #242726; --ink: #E8E6E1; --muted: #9A9F9B; --line: #353937;
+  --accent: var(--accent-d); --soft: color-mix(in srgb, var(--accent-d) 16%, #242726);
+  --accent-ink: #1B1D1C; --danger: #E08A7F; color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--ink); font-family: var(--sans);
   font-size: 16px; line-height: 1.6; min-height: 100vh;
-  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
 }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .hidden { display: none !important; }
+svg.i { width: 16px; height: 16px; flex: none; }
 
 /* 版面 */
-.wrap { max-width: 640px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px 24px; }
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 8px 0 18px; }
-h1 { font-family: var(--serif); font-weight: 700; font-size: 28px; line-height: 1.25; margin: 0; letter-spacing: .02em; }
-h2 { font-family: var(--serif); font-weight: 700; font-size: 19px; margin: 0 0 12px; }
-.sub { color: var(--muted); font-size: 14px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.wrap { max-width: 640px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top)) 20px 24px; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 10px 0 20px; }
+.eyebrow { font-family: var(--latin); font-weight: 500; letter-spacing: .22em; font-size: 13px; color: var(--muted); text-transform: uppercase; }
+h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.3; margin: 2px 0 0; letter-spacing: .04em; }
+h2 { font-family: var(--serif); font-weight: 500; font-size: 17px; margin: 0 0 12px; letter-spacing: .05em; }
+.sub { color: var(--muted); font-size: 13px; }
+.num { font-family: var(--latin); font-weight: 600; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
 .row { display: flex; align-items: center; gap: 8px; }
 .spread { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .stack > * + * { margin-top: 10px; }
 
 /* 按鈕 */
-.btn { border: 0; border-radius: 12px; padding: 11px 18px; font-weight: 600; background: var(--soft); color: var(--ink); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn { border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 500; letter-spacing: .04em; background: var(--soft); color: var(--ink); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn.primary { background: var(--ink); color: var(--bg); }
 .btn.ghost { background: transparent; border: 1px solid var(--line); }
+.btn.outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; }
 .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--line); }
-.btn.small { padding: 6px 12px; min-height: 36px; font-size: 14px; border-radius: 10px; }
+.btn.small { padding: 5px 14px; min-height: 34px; font-size: 14px; border-radius: 10px; }
+.btn.outline.small { border-radius: 999px; }
 .btn:disabled { opacity: .5; }
 .btn.block { width: 100%; }
-.icon-btn { border: 0; background: transparent; padding: 8px; border-radius: 10px; color: var(--muted); min-width: 40px; min-height: 40px; }
+.icon-btn { border: 0; background: transparent; padding: 8px; border-radius: 10px; color: var(--muted); min-width: 40px; min-height: 40px; font-size: 14px; }
 .icon-btn:active { background: var(--soft); }
 
 /* 輸入 */
@@ -82,133 +88,138 @@ textarea, input[type=text], input[type=password], input[type=date] {
   width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
   padding: 12px 14px; font-size: 17px; outline: none;
 }
-textarea { min-height: 150px; resize: vertical; line-height: 1.7; }
+textarea { min-height: 140px; resize: vertical; line-height: 1.75; }
 textarea:focus, input:focus { border-color: var(--accent); }
-label.field { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+label.field { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; letter-spacing: .04em; }
 
 /* 分類標籤 */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { border: 1.5px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 15px; font-size: 15px; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; }
-.chip .dot { width: 9px; height: 9px; border-radius: 50%; }
-.chip.on { border-color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 14%, var(--card)); font-weight: 600; }
-.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--c); }
-.tag .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 15px; font-size: 15px; min-height: 38px; display: inline-flex; align-items: center; gap: 7px; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+.chip.on { border-color: transparent; background: var(--soft); color: var(--accent); font-weight: 500; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+.tag .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
 
 /* 日記卡片 */
-.entry { border-top: 1px solid var(--line); padding: 14px 0 10px; }
+.entry { border-top: 1px solid var(--line); padding: 14px 0 8px; }
 .entry:first-child { border-top: 0; padding-top: 2px; }
-.entry-body { white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; }
-.entry-actions { display: flex; gap: 4px; margin-top: 4px; justify-content: flex-end; }
-.day-head { font-family: var(--serif); font-weight: 700; font-size: 16px; margin: 22px 0 4px; display: flex; align-items: baseline; gap: 8px; }
-.day-head .sub { font-family: var(--sans); font-weight: 400; }
+.entry-body { white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; line-height: 1.8; }
+.entry-actions { display: flex; gap: 2px; margin-top: 2px; justify-content: flex-end; }
+.day-head { font-family: var(--serif); font-weight: 500; font-size: 16px; margin: 24px 0 8px; display: flex; align-items: baseline; gap: 8px; letter-spacing: .04em; }
+.day-head .sub { font-family: var(--sans); }
 .empty { color: var(--muted); text-align: center; padding: 22px 8px; font-size: 15px; }
 
 /* 寫日記 */
-.hint { font-size: 14px; color: var(--muted); background: var(--soft); border-radius: 12px; padding: 10px 12px; display: flex; gap: 8px; align-items: flex-start; }
+.hint { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: flex-start; }
 .raw-peek { font-size: 14px; color: var(--muted); white-space: pre-wrap; background: var(--soft); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
-.btn.rec { background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
-.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+.btn.rec { background: color-mix(in srgb, var(--danger) 10%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); }
+.rec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; } }
-.interim { color: var(--muted); font-size: 15px; min-height: 0; margin-top: 6px; }
-.summary-body { white-space: pre-wrap; word-break: break-word; line-height: 1.8; }
-.summary-h { display: block; font-family: var(--serif); color: var(--accent); margin-top: 14px; }
-.summary-h:first-child { margin-top: 6px; }
-.summary-card { background: color-mix(in srgb, var(--accent) 7%, var(--card)); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
-.streak { display: inline-block; margin-top: 8px; font-size: 14px; padding: 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); }
-.streak.pending { background: var(--soft); color: var(--muted); }
-.streak b { font-size: 16px; }
-.bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.interim { color: var(--muted); font-size: 15px; margin-top: 6px; }
+.cat-desc { margin-top: 12px; padding: 2px 0 2px 12px; border-left: 2px solid var(--c); font-family: var(--serif); font-size: 15px; color: color-mix(in srgb, var(--ink) 72%, var(--card)); }
+.summary-body { white-space: pre-wrap; word-break: break-word; line-height: 1.9; font-family: var(--serif); }
+.summary-h { display: block; font-family: var(--serif); font-weight: 500; color: var(--accent); margin-top: 14px; letter-spacing: .06em; font-size: 14px; }
+.summary-h:first-child { margin-top: 4px; }
+.summary-card { border-left: 2px solid var(--accent); }
+.streak { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--accent); letter-spacing: .04em; }
+.streak.pending { color: var(--muted); }
+.streak b { font-family: var(--latin); font-weight: 600; font-size: 19px; line-height: 1; }
+.bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
 .bar-row { display: grid; grid-template-columns: 6.5em 1fr 2em; align-items: center; gap: 10px; }
-.bar-row b { text-align: right; }
-.bar { height: 10px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.bar-row b { text-align: right; font-family: var(--latin); font-weight: 600; font-size: 17px; }
+.bar { height: 4px; background: var(--soft); border-radius: 99px; overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 99px; min-width: 2px; }
 .hist-row { width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; display: flex; justify-content: space-between; align-items: center; padding: 12px 0; min-height: 48px; text-align: left; }
 .hist-row:first-child { border-top: 0; }
-.cat-desc { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 8%, var(--card)); border-radius: 0 10px 10px 0; font-size: 15px; }
-.habit-name { font-size: 17px; }
-.habit-card .habit-stats { margin: 8px 0 10px; }
-.hgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 300px; }
-.hgrid .wd { font-size: 11px; color: var(--muted); text-align: center; }
-.hgrid i { aspect-ratio: 1; border-radius: 6px; background: var(--soft); }
+details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* 打卡 */
+.check-list { display: flex; flex-direction: column; }
+.check { display: flex; align-items: center; gap: 12px; padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: transparent; text-align: left; width: 100%; min-height: 48px; }
+.check:first-child { border-top: 0; }
+.check .box { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--box); display: grid; place-items: center; flex: none; transition: all .15s; }
+.check.done .box { background: var(--accent); border-color: var(--accent); }
+.check.done .box::after { content: ""; width: 8px; height: 4px; border: 1.5px solid var(--accent-ink); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.check.done .label { color: var(--muted); }
+.progress { height: 3px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
+
+/* 習慣 */
+.habit-name { font-family: var(--serif); font-weight: 500; font-size: 17px; letter-spacing: .04em; }
+.habit-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); align-items: baseline; }
+.habit-stats b { color: var(--ink); font-family: var(--latin); font-weight: 600; font-size: 18px; margin-right: 2px; }
+.habit-card .habit-stats { margin: 8px 0 12px; }
+.hgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-width: 200px; }
+.hgrid .wd { font-size: 10px; color: var(--muted); text-align: center; }
+.hgrid i { aspect-ratio: 1; border-radius: 4px; background: var(--soft); }
 .hgrid i[data-d] { cursor: pointer; }
 .hgrid i.on { background: var(--accent); }
 .hgrid i.off { background: transparent; border: 1px dotted var(--line); }
 .hgrid i.na { background: transparent; }
 .hgrid i.future { background: transparent; border: 1px dashed var(--line); }
-.hgrid i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
-details summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0; }
+.hgrid i.today { outline: 1.5px solid var(--ink); outline-offset: 1px; }
 
-/* 打卡 */
-.check-list { display: flex; flex-direction: column; gap: 8px; }
-.check { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; width: 100%; min-height: 48px; }
-.check .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; flex: none; transition: all .15s; }
-.check.done .box { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.check.done .label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
-.progress { height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; }
-.progress > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
-
-/* 習慣統計 */
-.habit-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
-.habit-stats b { color: var(--ink); font-size: 15px; }
-
-/* 月曆 */
-.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
-.seg button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 8px; font-weight: 600; color: var(--muted); min-height: 40px; }
-.seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+/* 回顧 */
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 3px; margin-bottom: 16px; }
+.seg button { flex: 1; border: 0; background: transparent; border-radius: 10px; padding: 7px; font-weight: 500; color: var(--muted); min-height: 38px; letter-spacing: .04em; }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.cal .wd { font-size: 12px; color: var(--muted); padding-bottom: 4px; }
-.cal button { border: 0; background: transparent; border-radius: 10px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 15px; padding: 0; min-height: 40px; }
+.cal .wd { font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+.cal button { border: 0; background: transparent; border-radius: 50%; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: var(--latin); font-weight: 600; font-size: 17px; padding: 0; min-height: 40px; }
 .cal button.sel { background: var(--accent); color: var(--accent-ink); }
-.cal button.is-today:not(.sel) { font-weight: 700; color: var(--accent); }
-.cal .mini { display: flex; gap: 2px; height: 5px; }
-.cal .mini i { width: 5px; height: 5px; border-radius: 50%; background: var(--c); }
+.cal button.is-today:not(.sel) { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal .mini { display: flex; gap: 2px; height: 4px; }
+.cal .mini i { width: 4px; height: 4px; border-radius: 50%; background: var(--c); }
 .cal button.sel .mini i { background: var(--accent-ink); }
 
 /* 設定 */
-.cat-item { padding: 10px 0; border-top: 1px solid var(--line); }
+.cat-item { padding: 12px 0; border-top: 1px solid var(--line); }
 .cat-item:first-child { border-top: 0; }
-.cat-item textarea { min-height: 0; margin-top: 6px; padding: 8px 10px; font-size: 15px; }
+.cat-item textarea { min-height: 0; margin-top: 8px; padding: 8px 10px; font-size: 15px; }
 .cat-row { display: flex; align-items: center; gap: 8px; }
 .cat-row input[type=text] { padding: 8px 10px; font-size: 16px; }
-.cat-row input[type=color] { width: 36px; height: 36px; border: 0; padding: 0; background: none; border-radius: 50%; flex: none; }
+.cat-row input[type=color] { width: 32px; height: 32px; border: 0; padding: 0; background: none; border-radius: 50%; flex: none; }
 .cat-item.off input[type=text] { color: var(--muted); text-decoration: line-through; }
+.palettes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.palette { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.palette .sw { width: 30px; height: 30px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 5px var(--swbg); }
+.palette.on { border-color: var(--ink); color: var(--ink); }
 
 /* 底部分頁 */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line); display: flex; justify-content: center;
+  background: var(--card); border-top: 1px solid var(--line); display: flex; justify-content: center;
   padding-bottom: env(safe-area-inset-bottom);
 }
 nav.tabs .in { display: flex; max-width: 640px; width: 100%; }
-nav.tabs button { flex: 1; border: 0; background: transparent; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); min-height: 60px; }
-nav.tabs button svg { width: 24px; height: 24px; }
-nav.tabs button.on { color: var(--accent); font-weight: 600; }
+nav.tabs button { flex: 1; border: 0; background: transparent; padding: 9px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; letter-spacing: .08em; color: var(--muted); min-height: 60px; }
+nav.tabs button svg { width: 22px; height: 22px; }
+nav.tabs button.on { color: var(--accent); }
 
 /* 登入 */
-.login { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
-.login .card { width: 100%; max-width: 380px; text-align: center; padding: 28px 22px; }
+.login { min-height: 100vh; display: grid; place-items: center; padding: 24px 20px; }
+.login .card { width: 100%; max-width: 360px; text-align: center; padding: 32px 22px; }
 
 /* 提示訊息 */
-.toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-size: 15px; opacity: 0; transition: all .25s; z-index: 50; max-width: calc(100% - 32px); text-align: center; pointer-events: none; }
+.toast { position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-size: 14px; letter-spacing: .04em; opacity: 0; transition: all .25s; z-index: 50; max-width: calc(100% - 32px); text-align: center; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+.spin { width: 16px; height: 16px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-page { text-align: center; color: var(--muted); padding: 40px 0; }
 
 /* 彈窗 */
-.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { background: var(--card); width: 100%; max-width: 640px; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); max-height: 92vh; overflow-y: auto; }
+.sheet-bg { position: fixed; inset: 0; background: rgba(20,20,20,.3); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--card); width: 100%; max-width: 640px; border-radius: 20px 20px 0 0; padding: 22px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 92vh; overflow-y: auto; }
 @media (min-width: 700px) { .sheet-bg { align-items: center; } .sheet { border-radius: 20px; } }
-.item-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 </style>
 </head>
 <body>
 
 <div id="login" class="login hidden">
   <div class="card stack">
-    <div style="font-size:40px">📔</div>
-    <h1>我的日記</h1>
+    <div class="eyebrow">Journal</div>
+    <h1 style="margin-bottom:6px">我的日記</h1>
     <p class="sub" style="margin:0">請輸入密碼</p>
     <input id="pw" type="password" autocomplete="current-password" placeholder="密碼">
     <button id="loginBtn" class="btn primary block">進入</button>
@@ -220,13 +231,13 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
   <main class="wrap" id="view"></main>
   <nav class="tabs"><div class="in">
     <button data-tab="today" class="on">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>今天</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>今天</button>
     <button data-tab="review">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/><path d="M9 7h6M9 11h4"/></svg>回顧</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/><path d="M9 7h6M9 11h4"/></svg>回顧</button>
     <button data-tab="habits">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="m8 13 3 3 5-6"/></svg>清單</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="m8 13 3 3 5-6"/></svg>清單</button>
     <button data-tab="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>設定</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>設定</button>
   </div></nav>
 </div>
 
@@ -237,6 +248,30 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
 const API_URL = 'https://script.google.com/macros/s/AKfycbxXSQWkDSegS3QCSh50-WP7I8nixUKfDKMEjsskvYDowQQOlX689Atvmq7kmDfn26Cq/exec';
 
 // ───────── 共用 ─────────
+const svg = d => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  flame: svg('<path d="M12 21a6 6 0 0 0 6-6c0-4-3-6.5-6-12-3 5.5-6 8-6 12a6 6 0 0 0 6 6Z"/><path d="M12 21a2.5 2.5 0 0 1-2.5-2.5c0-1.7 1.2-2.6 2.5-4.5 1.3 1.9 2.5 2.8 2.5 4.5A2.5 2.5 0 0 1 12 21Z"/>'),
+  mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'),
+};
+const EN_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const EN_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const pageHead = (eyebrow, title, right = '') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div>${right}</div>`;
+
+// 配色（只換顏色，版型不變）
+const PALETTES = [
+  { id: 'sage', name: '鼠尾草', accent: '#6F8F7E', bg: '#F6F5F1' },
+  { id: 'rose', name: '霧玫瑰', accent: '#A6707E', bg: '#F7F2F0' },
+  { id: 'blue', name: '霧藍', accent: '#6B84A0', bg: '#F4F6F7' },
+  { id: 'tea', name: '奶茶', accent: '#A08268', bg: '#F7F3EE' },
+];
+function applyPalette(id) {
+  const p = PALETTES.find(x => x.id === id) || PALETTES[0];
+  document.documentElement.dataset.palette = p.id;
+  $('#themeColor').setAttribute('content', p.bg);
+}
+// 舊版預設分類顏色換成柔和版（存檔後就會寫回試算表）
+const SOFTEN = { '#C8794F': '#C9A27E', '#6F8FAF': '#8AA0B4', '#D4A23C': '#C7A96B', '#6E9A78': '#8FA88F' };
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
@@ -331,7 +366,7 @@ async function start() {
   $('#view').innerHTML = '<div class="loading-page"><span class="spin"></span></div>';
   try {
     const d = await api('init');
-    state.categories = d.categories; state.habits = d.habits || null;
+    state.categories = d.categories.map(c => ({ ...c, color: SOFTEN[(c.color || '').toUpperCase()] || c.color })); state.habits = d.habits || null;
     state.habitChecks = {};
     Object.entries(d.habitChecks || {}).forEach(([id, dates]) => state.habitChecks[id] = new Set(dates)); state.prompt = d.prompt || null;
     state.entryDates = d.entryDates ? new Set(d.entryDates) : null;
@@ -358,9 +393,9 @@ function streakHtml() {
   const done = state.entryDates.has(t);
   let n = 0, d = done ? t : addDays(t, -1);
   while (state.entryDates.has(d)) { n++; d = addDays(d, -1); }
-  const text = !n ? '寫下第一則，開始累積連續天數 🌱'
-    : done ? `🔥 已經連續寫了 <b>${n}</b> 天`
-    : `🔥 連續 <b>${n}</b> 天・今天寫一則就能接上`;
+  const text = !n ? '寫下第一則，開始累積連續天數'
+    : done ? `${ICON.flame} 已經連續寫了 <b>${n}</b> 天`
+    : `${ICON.flame} 連續 <b>${n}</b> 天・今天寫一則就能接上`;
   return `<div class="streak ${n && !done ? 'pending' : ''}">${text}</div>`;
 }
 
@@ -374,8 +409,8 @@ async function renderToday() {
   v.innerHTML = `
     <div class="page-head">
       <div>
-        <div class="sub">${isToday ? '今天' : '補寫'}</div>
-        <h1>${prettyDate(state.date)}</h1>
+        <div class="eyebrow">${EN_WD[parse(state.date).getDay()]} · ${EN_MON[parse(state.date).getMonth()]} ${parse(state.date).getDate()}${isToday ? '' : ' · 補寫'}</div>
+        <h1>${parse(state.date).getMonth() + 1}月${parse(state.date).getDate()}日</h1>
         ${isToday ? streakHtml() : ''}
       </div>
       <label class="btn ghost small" style="position:relative">換日期
@@ -432,16 +467,16 @@ function renderWriteStep() {
   stopRec();
   if (!d.polished) {
     box.innerHTML = `
-      <div class="hint"><span>🎙️</span><span>${SR
-        ? '按「開始說話」就能用說的，講完按「停止」，再按「幫我整理」。也可以用鍵盤上的麥克風。'
-        : '點下面的框，再按鍵盤上的<b>麥克風</b>就能用說的（Mac 按兩下 Fn 鍵）。講完再按「幫我整理」。'}</span></div>
-      ${SR ? '<button class="btn ghost block" id="micBtn" style="margin-top:10px">🎤 開始說話</button>' : ''}
-      <textarea id="raw" placeholder="想到什麼就說什麼…" style="margin-top:10px">${esc(d.raw)}</textarea>
+      <textarea id="raw" placeholder="想到什麼就說什麼…" style="margin-top:12px">${esc(d.raw)}</textarea>
       <div class="interim" id="interim"></div>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="polishBtn" style="flex:1">✨ 幫我整理</button>
-        <button class="btn ghost" id="saveRawBtn">直接儲存</button>
-      </div>`;
+        ${SR ? `<button class="btn ghost" id="micBtn">${ICON.mic} 說話</button>` : ''}
+        <button class="btn primary" id="polishBtn" style="flex:1">幫我整理</button>
+        <button class="btn ghost" id="saveRawBtn">直接存</button>
+      </div>
+      <div class="hint" style="margin-top:10px">${SR
+        ? '按「說話」就能用說的，講完再按一次停止，然後按「幫我整理」。也可以用鍵盤上的麥克風。'
+        : '可以用鍵盤上的麥克風用說的（Mac 按兩下 Fn 鍵），講完再按「幫我整理」。'}</div>`;
     $('#raw').oninput = e => { d.raw = e.target.value; saveDraft(); };
     if (SR) $('#micBtn').onclick = () => (rec ? stopRec() : startRec());
     $('#polishBtn').onclick = () => busy($('#polishBtn'), async () => {
@@ -528,7 +563,7 @@ function updateMicUI() {
   if ($('#interim') && !rec) $('#interim').textContent = '';
   if (!b) return;
   b.classList.toggle('rec', !!rec);
-  b.innerHTML = rec ? '<span class="rec-dot"></span> 錄音中…按這裡停止' : '🎤 開始說話';
+  b.innerHTML = rec ? '<span class="rec-dot"></span> 停止' : `${ICON.mic} 說話`;
 }
 
 // 每日總結
@@ -543,11 +578,11 @@ async function renderSummary() {
   try { s = (await loadSummaries(monthOf(date)))[date]; } catch (e) {}
   if (state.tab !== 'today' || date !== state.date || !box.isConnected) return;
   box.innerHTML = s ? `
-    <div class="spread"><h2 style="margin:0">🌙 ${label}的總結</h2><button class="btn small ghost" id="sumBtn">重新整理</button></div>
+    <div class="spread"><h2 style="margin:0">${label}的總結</h2><button class="btn small ghost" id="sumBtn">重新整理</button></div>
     ${summaryHtml(s)}` : `
-    <h2>🌙 ${label}的總結</h2>
+    <h2>${label}的總結</h2>
     <p class="sub" style="margin:-4px 0 12px">寫完日記、打完卡之後，讓 Claude 幫你回顧${label}，再送你一段話。</p>
-    <button class="btn primary block" id="sumBtn">🌙 幫我整理${label}</button>`;
+    <button class="btn outline block" id="sumBtn">幫我整理${label}</button>`;
   $('#sumBtn').onclick = e => busy(e.currentTarget, async () => {
     const res = await api('summarizeDay', { date });
     (state.summaries[monthOf(date)] = state.summaries[monthOf(date)] || {})[date] = res;
@@ -575,7 +610,7 @@ async function renderDayEntries() {
     const date = state.date;
     const list = (await loadMonth(monthOf(date))).filter(e => e.date === date);
     if (state.tab !== 'today' || date !== state.date) return;
-    box.innerHTML = list.length ? list.map(entryHtml).join('') : '<div class="empty">還沒有內容，寫下第一則吧 🌱</div>';
+    box.innerHTML = list.length ? list.map(entryHtml).join('') : '<div class="empty">還沒有內容，寫下第一則吧</div>';
     bindEntryActions(box, list, () => renderDayEntries());
   } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -621,7 +656,7 @@ function bindEntryActions(box, list, refresh) {
 async function renderReview() {
   const r = state.review;
   $('#view').innerHTML = `
-    <div class="page-head"><h1>回顧</h1></div>
+    ${pageHead('Journal', '回顧')}
     <div class="seg"><button data-mode="date" class="${r.mode === 'date' ? 'on' : ''}">依日期</button><button data-mode="cat" class="${r.mode === 'cat' ? 'on' : ''}">依分類</button><button data-mode="ai" class="${r.mode === 'ai' ? 'on' : ''}">AI 回顧</button></div>
     <div id="reviewBody"></div>`;
   document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { r.mode = b.dataset.mode; renderReview(); });
@@ -747,7 +782,7 @@ async function renderPeriod() {
         <div style="flex:1"><label class="field">從</label><input type="date" id="pFrom" value="${r.from}" max="${today()}"></div>
         <div style="flex:1"><label class="field">到</label><input type="date" id="pTo" value="${r.to}" max="${today()}"></div>
       </div>
-      <button class="btn primary block" id="periodBtn">✨ 幫我回顧這段時間</button>
+      <button class="btn primary block" id="periodBtn">幫我回顧這段時間</button>
     </section>
     <div id="periodResult">${r.result ? periodHtml(r.result) : ''}</div>
     <div id="periodHistory"></div>`;
@@ -850,7 +885,7 @@ function renderTodayChecks() {
     <div class="progress" style="margin-bottom:12px"><i style="width:${n / list.length * 100}%"></i></div>
     <div class="check-list">${list.map(h => `
       <button class="check ${doneOn(h, date) ? 'done' : ''}" data-id="${h.id}">
-        <span class="box">${doneOn(h, date) ? '✓' : ''}</span>
+        <span class="box"></span>
         <span class="label">${esc(h.name)}</span>
         <span class="sub" style="margin-left:auto">${h.freq === 'weekly' ? `本週 ${weekCount(h, date)}/${h.times}` : h.freq === 'weekdays' ? freqLabel(h) : ''}</span>
       </button>`).join('')}</div>
@@ -865,14 +900,13 @@ function renderTodayChecks() {
 function renderHabits() {
   const v = $('#view');
   if (!state.habits) {
-    v.innerHTML = '<div class="page-head"><h1>清單</h1></div><div class="card empty">後端還沒更新，請先部署新版本</div>';
+    v.innerHTML = pageHead('Habits', '清單') + '<div class="card empty">後端還沒更新，請先部署新版本</div>';
     return;
   }
   const active = state.habits.filter(h => h.active);
   const archived = state.habits.filter(h => !h.active);
   v.innerHTML = `
-    <div class="page-head"><div><h1>清單</h1><div class="sub">每一項都可以設定自己的頻率</div></div>
-      <button class="btn primary small" id="newHabit">＋ 新增</button></div>
+    ${pageHead('Habits', '清單', '<button class="btn outline small" id="newHabit">＋ 新增</button>')}
     ${active.length ? active.map(h => `
       <section class="card habit-card" data-id="${h.id}">
         <div class="spread"><div><b class="habit-name">${esc(h.name)}</b><div class="sub">${freqLabel(h)}</div></div>
@@ -965,7 +999,13 @@ const PROMPTS = [
 function renderSettings() {
   const cats = JSON.parse(JSON.stringify(state.categories));
   $('#view').innerHTML = `
-    <div class="page-head"><h1>設定</h1></div>
+    ${pageHead('Settings', '設定')}
+    <section class="card">
+      <h2>主題顏色</h2>
+      <div class="palettes" id="palettes">${PALETTES.map(p => `
+        <button class="palette ${(document.documentElement.dataset.palette || 'sage') === p.id ? 'on' : ''}" data-id="${p.id}" style="--sw:${p.accent};--swbg:${p.bg}">
+          <span class="sw"></span>${p.name}</button>`).join('')}</div>
+    </section>
     <section class="card">
       <h2>日記分類</h2>
       <p class="sub" style="margin:-6px 0 10px">隱藏的分類不會出現在寫日記的選項，但舊日記還在。</p>
@@ -991,7 +1031,12 @@ function renderSettings() {
     </section>
     <section class="card"><button class="btn danger block" id="logoutBtn">登出這支裝置</button></section>`;
   const rows = $('#catRows');
-  const palette = ['#C8794F', '#6F8FAF', '#D4A23C', '#6E9A78', '#A0729B', '#C25E6E', '#5E9C9C', '#8C7B5E'];
+  const palette = ['#C9A27E', '#8AA0B4', '#C7A96B', '#8FA88F', '#A895B5', '#C49A9F', '#86A7A6', '#A8977F'];
+  $('#palettes').onclick = e => {
+    const b = e.target.closest('.palette'); if (!b) return;
+    applyPalette(b.dataset.id); store.set('palette', b.dataset.id);
+    document.querySelectorAll('.palette').forEach(x => x.classList.toggle('on', x === b));
+  };
   const draw = () => {
     rows.innerHTML = cats.map((c, i) => `
       <div class="cat-item ${c.active ? '' : 'off'}" data-i="${i}">
@@ -1045,6 +1090,7 @@ function renderSettings() {
 }
 
 // ───────── 開始 ─────────
+applyPalette(store.get('palette', 'sage'));
 if (state.password) start(); else logout();
 </script>
 </body>
